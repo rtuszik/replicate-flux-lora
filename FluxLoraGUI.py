@@ -1,4 +1,3 @@
-import sys
 import os
 import time
 from urllib.request import urlretrieve
@@ -9,7 +8,7 @@ from PyQt6.QtWidgets import (
     QProgressBar, QFileDialog, QDialog, QStatusBar
 )
 from PyQt6.QtGui import QPixmap, QGuiApplication, QResizeEvent
-from PyQt6.QtCore import Qt, QThread, pyqtSignal, QSettings, QTimer, QSize, QRunnable, QThreadPool, QObject
+from PyQt6.QtCore import Qt, QThread, pyqtSignal, QSettings, QTimer, QRunnable, QThreadPool, QObject
 import replicate
 from dotenv import load_dotenv
 from token_count import TokenCount
