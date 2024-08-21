@@ -2,7 +2,7 @@
 
 ## Overview
 
-This Image Generator GUI is a Python application that provides a user-friendly interface for generating images using the Flux-Dev LoRA model via Replicate. It allows users to input prompts, adjust various parameters, and generate high-quality images with ease.
+This Image Generator GUI is a Python application that provides a user-friendly interface for generating images using the [LucaTaco Flux-Dev LoRA explorer](https://replicate.com/lucataco/flux-dev-lora/readme) via Replicate. It allows users to input prompts, adjust various parameters, and generate high-quality images with ease.
 
 ## Features
 
@@ -24,13 +24,13 @@ This Image Generator GUI is a Python application that provides a user-friendly i
 
 1. Clone this repository:
    ```
-   git clone [your-repository-url]
-   cd [repository-name]
+   git clone https://github.com/rtuszik/flux-dev-lora-python.git
+   cd flux-dev-lora-python
    ```
 
 2. Install the required dependencies:
    ```
-   pip install PyQt6 replicate python-dotenv Pillow token-count
+   pip install -r requirements.txt
    ```
 
 3. Set up your Replicate API key:
@@ -41,7 +41,7 @@ This Image Generator GUI is a Python application that provides a user-friendly i
 
 1. Run the application:
    ```
-   python FluxLoraGUI.py
+   python3 FluxLoraGUI.py
    ```
 
 2. Enter your prompt in the text box.
@@ -65,10 +65,6 @@ This application uses the Flux-Dev LoRA model implemented via Huggingface Diffus
 ## Contributing
 
 Contributions to improve the Image Generator GUI are welcome. Please feel free to submit pull requests or open issues for bugs and feature requests.
-
-## License
-
-[Specify your license here]
 
 ---
 
