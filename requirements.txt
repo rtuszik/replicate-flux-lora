@@ -1,0 +1,4 @@
+PyQt6==6.7.1
+replicate==0.31.0
+python-dotenv==1.0.1
+token_count==0.2.1
