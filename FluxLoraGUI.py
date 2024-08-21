@@ -165,6 +165,7 @@ class ImageGeneratorGUI(QMainWindow):
         self.initUI()
         self.loadSettings()
         QTimer.singleShot(100, self.loadImagesAsync)
+        self.current_thread = None
 
     def initUI(self):
         self.setStyleSheet("""
@@ -276,6 +277,18 @@ class ImageGeneratorGUI(QMainWindow):
         self.disable_safety_checker_input = QCheckBox("Disable Safety")
         self.disable_safety_checker_input.setChecked(True)
 
+        # Tooltips
+        self.aspect_ratio_input.setToolTip("Select the aspect ratio for the generated image")
+        self.num_outputs_input.setToolTip("Number of images to generate")
+        self.num_inference_steps_input.setToolTip("More steps generally result in higher quality images but take longer to generate")
+        self.guidance_scale_input.setToolTip("How closely the model follows the prompt. Higher values stick closer to the prompt")
+        self.seed_input.setToolTip("Seed for random number generation. Use the same seed to reproduce results")
+        self.output_format_input.setToolTip("File format for the generated images")
+        self.output_quality_input.setToolTip("Quality of the output image (for jpg format)")
+        self.hf_lora_input.setToolTip("HuggingFace LoRA model to use")
+        self.lora_scale_input.setToolTip("Strength of the LoRA effect")
+        self.disable_safety_checker_input.setToolTip("Disable the safety filter (use with caution)")
+
         # Add widgets to form layout
         form_layout.addRow("Aspect Ratio:", self.aspect_ratio_input)
         form_layout.addRow("Outputs:", self.num_outputs_input)
@@ -345,6 +358,12 @@ class ImageGeneratorGUI(QMainWindow):
         self.progress_bar.hide()
         bottom_layout.addWidget(self.progress_bar)
 
+        # Add interrupt button
+        self.interrupt_button = QPushButton('Interrupt Generation')
+        self.interrupt_button.clicked.connect(self.interrupt_generation)
+        self.interrupt_button.setEnabled(False)
+        bottom_layout.addWidget(self.interrupt_button)
+
         # Add bottom layout to main layout
         main_layout.addLayout(bottom_layout)
 
@@ -352,6 +371,13 @@ class ImageGeneratorGUI(QMainWindow):
         status_bar = QStatusBar()
         self.setStatusBar(status_bar)
         status_bar.showMessage("Ready")
+
+        # Add grid/list view toggle
+        self.view_toggle = QPushButton('Toggle View')
+        self.view_toggle.clicked.connect(self.toggle_view)
+        top_layout.addWidget(self.view_toggle)
+
+        self.is_grid_view = True
 
         self.setWindowTitle('Image Generator')
         self.resize(1900, 800)
@@ -363,35 +389,46 @@ class ImageGeneratorGUI(QMainWindow):
         loader.signals.finished.connect(self.updateGallery)
         self.threadpool.start(loader)
 
-    def updateGallery(self, image_paths):
+    def toggle_view(self):
+        self.is_grid_view = not self.is_grid_view
+        self.clearGallery()
+        self.updateGallery()
+
+    def updateGallery(self, image_paths=None):
+        if image_paths is None:
+            image_paths = [self.gallery_layout.itemAt(i).widget().file_path
+                           for i in range(self.gallery_layout.count())]
 
         sorted_images = sorted(image_paths, key=lambda x: os.path.getctime(x), reverse=True)
 
-        existing_images = {self.gallery_layout.itemAt(i).widget().file_path for i in range(self.gallery_layout.count())}
+        existing_images = {self.gallery_layout.itemAt(i).widget().file_path
+                           for i in range(self.gallery_layout.count())}
 
         images_to_add = [path for path in sorted_images if path not in existing_images]
 
         for path in images_to_add:
             pixmap = QPixmap(path)
             preview = ImagePreviewWidget(pixmap, path)
-            row = (self.gallery_layout.count() // 2) // 2
-            col = self.gallery_layout.count() % 2
+            if self.is_grid_view:
+                row = self.gallery_layout.count() // 3
+                col = self.gallery_layout.count() % 3
+            else:
+                row = self.gallery_layout.count()
+                col = 0
             self.gallery_layout.addWidget(preview, row, col)
+
+        # Ensure all widgets are visible
+        for i in range(self.gallery_layout.count()):
+            self.gallery_layout.itemAt(i).widget().show()
 
         self.gallery_scroll.verticalScrollBar().setValue(self.gallery_scroll.verticalScrollBar().minimum())
 
     def clearGallery(self):
-
         for i in reversed(range(self.gallery_layout.count())):
             widget = self.gallery_layout.itemAt(i).widget()
             if widget is not None:
-                widget.setParent(None)
-                widget.deleteLater()
-
-        while self.gallery_layout.count():
-            item = self.gallery_layout.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
+                widget.hide()  # Hide the widget instead of deleting it
+                self.gallery_layout.removeWidget(widget)
 
     def center(self):
         primary_screen = QGuiApplication.primaryScreen()
@@ -405,8 +442,10 @@ class ImageGeneratorGUI(QMainWindow):
     def display_images(self, image_urls):
         self.progress_bar.hide()
         self.generate_button.setEnabled(True)
+        self.interrupt_button.setEnabled(False)
 
         timestamp = time.strftime("%Y%m%d_%H%M%S")
+        new_image_paths = []
         for i, image_url in enumerate(image_urls):
             if self.auto_save_checkbox.isChecked():
                 base_name = f"generated_image_{timestamp}_{i+1}.{self.output_format_input.currentText()}"
@@ -417,20 +456,17 @@ class ImageGeneratorGUI(QMainWindow):
                     image_path = os.path.join(self.save_dir_input.text(), new_name)
                     counter += 1
                 urlretrieve(image_url, image_path)
+                new_image_paths.append(image_path)
             else:
                 image_path = f"temp_image_{i}.{self.output_format_input.currentText()}"
                 urlretrieve(image_url, image_path)
+                new_image_paths.append(image_path)
 
-            pixmap = QPixmap(image_path)
-            preview = ImagePreviewWidget(pixmap, image_path if self.auto_save_checkbox.isChecked() else None)
-            self.gallery_layout.addWidget(preview, i // 2, i % 2)
+        self.updateGallery(new_image_paths)
 
-            if not self.auto_save_checkbox.isChecked():
-                os.remove(image_path)
-
-        self.loadImagesAsync()
-        self.adjustSize()
-        self.center()
+        if not self.auto_save_checkbox.isChecked():
+            for path in new_image_paths:
+                os.remove(path)
 
     def loadSettings(self):
         self.prompt_input.setPlainText(self.settings.value("prompt", ""))
@@ -496,15 +532,25 @@ class ImageGeneratorGUI(QMainWindow):
         self.progress_bar.show()
         self.generate_button.setEnabled(False)
 
-        self.thread = ImageGeneratorThread(params)
-        self.thread.finished.connect(self.display_images)
-        self.thread.error.connect(self.show_error)
-        self.thread.start()
+        self.current_thread = ImageGeneratorThread(params)
+        self.current_thread.finished.connect(self.display_images)
+        self.current_thread.error.connect(self.show_error)
+        self.current_thread.start()
+
+        self.interrupt_button.setEnabled(True)
+
+    def interrupt_generation(self):
+        if self.current_thread and self.current_thread.isRunning():
+            self.current_thread.terminate()
+            self.current_thread.wait()
+            self.show_error("Image generation interrupted by user.")
+        self.interrupt_button.setEnabled(False)
 
     def show_error(self, error_message):
         self.progress_bar.hide()
         self.generate_button.setEnabled(True)
         QMessageBox.critical(self, "Error", f"An error occurred: {error_message}")
+        self.interrupt_button.setEnabled(False)
 
     def clear_images(self):
         for i in reversed(range(self.gallery_layout.count())):
