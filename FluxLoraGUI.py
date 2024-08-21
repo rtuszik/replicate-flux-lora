@@ -2,12 +2,13 @@ import sys
 import os
 import time
 from urllib.request import urlretrieve
-import sys
-from PyQt6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, QPushButton, QLabel,
-                             QScrollArea, QGridLayout, QMessageBox, QComboBox, QSpinBox, QDoubleSpinBox, QCheckBox,
-                             QFormLayout, QSizePolicy, QTextEdit, QProgressBar, QFileDialog, QDialog, QToolBar,
-                             QMainWindow, QStatusBar)
-from PyQt6.QtGui import QPixmap, QGuiApplication, QResizeEvent, QAction, QIcon
+from PyQt6.QtWidgets import (
+    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLineEdit,
+    QPushButton, QLabel, QScrollArea, QGridLayout, QMessageBox, QComboBox,
+    QSpinBox, QDoubleSpinBox, QCheckBox, QFormLayout, QSizePolicy, QTextEdit,
+    QProgressBar, QFileDialog, QDialog, QStatusBar
+)
+from PyQt6.QtGui import QPixmap, QGuiApplication, QResizeEvent
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QSettings, QTimer, QSize, QRunnable, QThreadPool, QObject
 import replicate
 from dotenv import load_dotenv
@@ -51,12 +52,6 @@ class ImageGeneratorThread(QThread):
             self.finished.emit(output)
         except Exception as e:
             self.error.emit(str(e))
-
-class ExpandingTextEdit(QTextEdit):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        self.setMinimumHeight(200)
 
 class TokenCounter(QWidget):
     def __init__(self, text_edit, *args, **kwargs):
@@ -141,13 +136,13 @@ class ImagePreviewWidget(QLabel):
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.setStyleSheet("""
             QLabel {
-                border: 2px solid
+                border: 2px solid #555555;
                 border-radius: 10px;
                 padding: 5px;
                 margin: 5px;
             }
             QLabel:hover {
-                border-color:
+                border-color: #0078d7;
             }
         """)
         self.setMinimumSize(310, 310)
@@ -162,13 +157,25 @@ class ImageGeneratorGUI(QMainWindow):
         super().__init__()
         self.settings = QSettings("YourCompany", "ImageGenerator")
         self.threadpool = QThreadPool()
+        self.current_thread = None
+        self.is_grid_view = True
         self.initUI()
         self.loadSettings()
         QTimer.singleShot(100, self.loadImagesAsync)
-        self.current_thread = None
 
     def initUI(self):
-        self.setStyleSheet("""
+        self.setStyleSheet(self.getStyleSheet())
+        self.setupMainWidget()
+        self.setupLeftPanel()
+        self.setupRightPanel()
+        self.setupBottomPanel()
+        self.setupStatusBar()
+        self.setWindowTitle('Image Generator')
+        self.resize(1900, 800)
+        self.setMinimumWidth(1600)
+
+    def getStyleSheet(self):
+        return """
             QMainWindow, QWidget {
                 background-color: #2b2b2b;
                 color: #f0f0f0;
@@ -204,15 +211,6 @@ class ImageGeneratorGUI(QMainWindow):
             QLabel {
                 color: #f0f0f0;
             }
-            QToolBar {
-                background-color: #2b2b2b;
-                border-bottom: 1px solid #555555;
-                spacing: 10px;
-            }
-            QStatusBar {
-                background-color: #2b2b2b;
-                color: #86868b;
-            }
             QScrollArea {
                 border: none;
                 background-color: #3c3c3c;
@@ -233,93 +231,77 @@ class ImageGeneratorGUI(QMainWindow):
                 border: 2px solid #0078d7;
                 background-color: #0078d7;
             }
-        """)
+        """
 
+    def setupMainWidget(self):
         main_widget = QWidget()
         main_layout = QVBoxLayout(main_widget)
         main_layout.setContentsMargins(20, 20, 20, 20)
         main_layout.setSpacing(20)
         self.setCentralWidget(main_widget)
 
-        # Top layout for left (form) and right (gallery) columns
         top_layout = QHBoxLayout()
+        main_layout.addLayout(top_layout, 1)
 
-        # Left column layout
-        left_layout = QVBoxLayout()
+        self.left_layout = QVBoxLayout()
+        top_layout.addLayout(self.left_layout, 1)
 
-        # Input form layout
+        self.right_layout = QVBoxLayout()
+        top_layout.addLayout(self.right_layout, 2)
+
+        self.bottom_layout = QVBoxLayout()
+        main_layout.addLayout(self.bottom_layout)
+
+    def setupLeftPanel(self):
+        self.setupFormInputs()
+        self.setupSaveSettings()
+
+    def setupFormInputs(self):
         form_layout = QFormLayout()
         form_layout.setSpacing(10)
         form_layout.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
         form_layout.setFormAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
 
-        # Initialize and set up the input widgets
-        self.aspect_ratio_input = QComboBox()
-        self.aspect_ratio_input.addItems(["1:1", "16:9", "21:9", "3:2", "2:3", "4:5", "5:4", "3:4", "4:3", "9:16", "9:21"])
-        self.num_outputs_input = QSpinBox()
-        self.num_outputs_input.setRange(1, 4)
-        self.num_inference_steps_input = QSpinBox()
-        self.num_inference_steps_input.setRange(1, 50)
-        self.guidance_scale_input = QDoubleSpinBox()
-        self.guidance_scale_input.setRange(0, 10)
-        self.guidance_scale_input.setSingleStep(0.1)
-        self.seed_input = QSpinBox()
-        self.seed_input.setRange(-2147483648, 2147483647)
-        self.seed_input.setSpecialValueText("Random")
-        self.output_format_input = QComboBox()
-        self.output_format_input.addItems(["png", "jpg", "webp"])
-        self.output_quality_input = QSpinBox()
-        self.output_quality_input.setRange(0, 100)
+        self.aspect_ratio_input = self.createComboBox(["1:1", "16:9", "21:9", "3:2", "2:3", "4:5", "5:4", "3:4", "4:3", "9:16", "9:21"])
+        self.num_outputs_input = self.createSpinBox(1, 4)
+        self.num_inference_steps_input = self.createSpinBox(1, 50)
+        self.guidance_scale_input = self.createDoubleSpinBox(0, 10, 0.1)
+        self.seed_input = self.createSpinBox(-2147483648, 2147483647, "Random")
+        self.output_format_input = self.createComboBox(["png", "jpg", "webp"])
+        self.output_quality_input = self.createSpinBox(0, 100)
         self.hf_lora_input = QLineEdit()
-        self.lora_scale_input = QDoubleSpinBox()
-        self.lora_scale_input.setRange(0, 1)
-        self.lora_scale_input.setSingleStep(0.1)
+        self.lora_scale_input = self.createDoubleSpinBox(0, 1, 0.1)
         self.disable_safety_checker_input = QCheckBox("Disable Safety")
         self.disable_safety_checker_input.setChecked(True)
 
-        # Tooltips
-        self.aspect_ratio_input.setToolTip("Select the aspect ratio for the generated image")
-        self.num_outputs_input.setToolTip("Number of images to generate")
-        self.num_inference_steps_input.setToolTip("More steps generally result in higher quality images but take longer to generate")
-        self.guidance_scale_input.setToolTip("How closely the model follows the prompt. Higher values stick closer to the prompt")
-        self.seed_input.setToolTip("Seed for random number generation. Use the same seed to reproduce results")
-        self.output_format_input.setToolTip("File format for the generated images")
-        self.output_quality_input.setToolTip("Quality of the output image (for jpg format)")
-        self.hf_lora_input.setToolTip("HuggingFace LoRA model to use")
-        self.lora_scale_input.setToolTip("Strength of the LoRA effect")
-        self.disable_safety_checker_input.setToolTip("Disable the safety filter (use with caution)")
+        self.addFormRow(form_layout, "Aspect Ratio:", self.aspect_ratio_input)
+        self.addFormRow(form_layout, "Outputs:", self.num_outputs_input)
+        self.addFormRow(form_layout, "Inference Steps:", self.num_inference_steps_input)
+        self.addFormRow(form_layout, "Guidance Scale:", self.guidance_scale_input)
+        self.addFormRow(form_layout, "Seed:", self.seed_input)
+        self.addFormRow(form_layout, "Output Format:", self.output_format_input)
+        self.addFormRow(form_layout, "Quality:", self.output_quality_input)
+        self.addFormRow(form_layout, "HF LoRA:", self.hf_lora_input)
+        self.addFormRow(form_layout, "LoRA Scale:", self.lora_scale_input)
+        self.addFormRow(form_layout, "", self.disable_safety_checker_input)
 
-        # Add widgets to form layout
-        form_layout.addRow("Aspect Ratio:", self.aspect_ratio_input)
-        form_layout.addRow("Outputs:", self.num_outputs_input)
-        form_layout.addRow("Inference Steps:", self.num_inference_steps_input)
-        form_layout.addRow("Guidance Scale:", self.guidance_scale_input)
-        form_layout.addRow("Seed:", self.seed_input)
-        form_layout.addRow("Output Format:", self.output_format_input)
-        form_layout.addRow("Quality:", self.output_quality_input)
-        form_layout.addRow("HF LoRA:", self.hf_lora_input)
-        form_layout.addRow("LoRA Scale:", self.lora_scale_input)
-        form_layout.addRow("", self.disable_safety_checker_input)
+        self.left_layout.addLayout(form_layout)
 
-        left_layout.addLayout(form_layout)
-
-        # Save settings (auto-save checkbox and directory chooser)
+    def setupSaveSettings(self):
         self.auto_save_checkbox = QCheckBox("Auto-save")
         self.save_dir_input = QLineEdit()
         self.save_dir_input.setReadOnly(True)
         self.choose_dir_button = QPushButton("Choose Directory")
+        self.choose_dir_button.clicked.connect(self.choose_save_directory)
 
         save_settings_layout = QHBoxLayout()
         save_settings_layout.addWidget(self.auto_save_checkbox)
         save_settings_layout.addWidget(self.save_dir_input)
         save_settings_layout.addWidget(self.choose_dir_button)
 
-        left_layout.addLayout(save_settings_layout)
+        self.left_layout.addLayout(save_settings_layout)
 
-        # Add left layout to top layout
-        top_layout.addLayout(left_layout, 1)
-
-        # Right column (Gallery)
+    def setupRightPanel(self):
         self.gallery_scroll = QScrollArea()
         self.gallery_scroll.setWidgetResizable(True)
         self.gallery_widget = QWidget()
@@ -327,61 +309,66 @@ class ImageGeneratorGUI(QMainWindow):
         self.gallery_layout.setSpacing(10)
         self.gallery_scroll.setWidget(self.gallery_widget)
 
-        top_layout.addWidget(self.gallery_scroll, 2)
+        self.right_layout.addWidget(self.gallery_scroll)
 
-        # Add top layout (left and right columns) to main layout
-        main_layout.addLayout(top_layout, 1)
+        self.view_toggle = QPushButton('Toggle View')
+        self.view_toggle.clicked.connect(self.toggle_view)
+        self.right_layout.addWidget(self.view_toggle)
 
-        # Bottom layout for prompt input, generate button, and progress bar
-        bottom_layout = QVBoxLayout()
-
-        # Prompt input
+    def setupBottomPanel(self):
         self.prompt_input = QTextEdit()
         self.prompt_input.setFixedHeight(100)
         self.prompt_input.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        bottom_layout.addWidget(QLabel("Prompt:"))
-        bottom_layout.addWidget(self.prompt_input)
-        self.token_counter = TokenCounter(self.prompt_input)
-        bottom_layout.addWidget(self.token_counter)
+        self.bottom_layout.addWidget(QLabel("Prompt:"))
+        self.bottom_layout.addWidget(self.prompt_input)
 
-        # Generate button
+        self.token_counter = TokenCounter(self.prompt_input)
+        self.bottom_layout.addWidget(self.token_counter)
+
         self.generate_button = QPushButton('Generate Images')
         self.generate_button.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.generate_button.setFixedHeight(50)
-        self.generate_button.clicked.connect(self.generate_images)  # Connect the button to the method
-        bottom_layout.addWidget(self.generate_button)
+        self.generate_button.clicked.connect(self.generate_images)
+        self.bottom_layout.addWidget(self.generate_button)
 
-        # Progress bar
         self.progress_bar = QProgressBar()
         self.progress_bar.setRange(0, 0)
         self.progress_bar.setTextVisible(False)
         self.progress_bar.hide()
-        bottom_layout.addWidget(self.progress_bar)
+        self.bottom_layout.addWidget(self.progress_bar)
 
-        # Add interrupt button
         self.interrupt_button = QPushButton('Interrupt Generation')
         self.interrupt_button.clicked.connect(self.interrupt_generation)
         self.interrupt_button.setEnabled(False)
-        bottom_layout.addWidget(self.interrupt_button)
+        self.bottom_layout
 
-        # Add bottom layout to main layout
-        main_layout.addLayout(bottom_layout)
+        self.bottom_layout.addWidget(self.interrupt_button)
 
-        # Status bar
+    def setupStatusBar(self):
         status_bar = QStatusBar()
         self.setStatusBar(status_bar)
         status_bar.showMessage("Ready")
 
-        # Add grid/list view toggle
-        self.view_toggle = QPushButton('Toggle View')
-        self.view_toggle.clicked.connect(self.toggle_view)
-        top_layout.addWidget(self.view_toggle)
+    def createComboBox(self, items):
+        combo_box = QComboBox()
+        combo_box.addItems(items)
+        return combo_box
 
-        self.is_grid_view = True
+    def createSpinBox(self, min_value, max_value, special_value_text=None):
+        spin_box = QSpinBox()
+        spin_box.setRange(min_value, max_value)
+        if special_value_text:
+            spin_box.setSpecialValueText(special_value_text)
+        return spin_box
 
-        self.setWindowTitle('Image Generator')
-        self.resize(1900, 800)
-        self.setMinimumWidth(1600)
+    def createDoubleSpinBox(self, min_value, max_value, step):
+        double_spin_box = QDoubleSpinBox()
+        double_spin_box.setRange(min_value, max_value)
+        double_spin_box.setSingleStep(step)
+        return double_spin_box
+
+    def addFormRow(self, form_layout, label, widget):
+        form_layout.addRow(label, widget)
 
     def loadImagesAsync(self):
         folder_path = self.save_dir_input.text()
