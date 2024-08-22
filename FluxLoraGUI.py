@@ -72,7 +72,7 @@ class ImageGeneratorThread(QThread):
     def run(self):
         try:
             output = replicate.run(
-                "lucataco/flux-dev-lora:a22c463f11808638ad5e2ebd582e07a469031f48dd567366fb4c6fdab91d614d",
+                "rtuszik/fluxlyptus:4e304b52ad6745623fb29f3250d89df23ac38b42734887d9e0a4b3a31c648472",
                 input=self.params,
             )
             self.finished.emit(output)
