@@ -171,13 +171,13 @@ class ImagePreviewWidget(QLabel):
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.setStyleSheet("""
             QLabel {
-                border: 2px solid #555555;
+                border: 2px solid
                 border-radius: 10px;
                 padding: 5px;
                 margin: 5px;
             }
             QLabel:hover {
-                border-color: #0078d7;
+                border-color:
             }
         """)
         self.setMinimumSize(310, 310)
@@ -194,9 +194,13 @@ class ImageGeneratorGUI(QMainWindow):
         self.threadpool = QThreadPool()
         self.current_thread = None
         self.is_grid_view = True
+        self.save_metadata_checkbox = None
         self.initUI()
         self.loadSettings()
-        self.save_metadata_checkbox = None
+        if self.save_metadata_checkbox is None:
+            print(
+                "Warning: save_metadata_checkbox is still None after initUI and loadSettings"
+            )
         QTimer.singleShot(100, self.loadImagesAsync)
 
     def initUI(self):
@@ -213,64 +217,64 @@ class ImageGeneratorGUI(QMainWindow):
     def getStyleSheet(self):
         return """
             QMainWindow, QWidget {
-                background-color: #2b2b2b;
-                color: #f0f0f0;
+                background-color:
+                color:
                 font-family: 'Arial', 'Sans-Serif';
                 font-size: 13px;
             }
             QLineEdit, QTextEdit, QComboBox, QSpinBox, QDoubleSpinBox {
-                background-color: #3c3c3c;
-                border: 1px solid #555555;
-                border-radius: 5px;
+                background-color:
+                border: 1px solid
+                borderradius: 5px;
                 padding: 5px;
-                color: #f0f0f0;
+                color:
                 width: 100%;
             }
             QPushButton {
-                background-color: #5c5c5c;
+                background-color:
                 color: white;
                 border: none;
-                border-radius: 5px;
+                borderradius: 5px;
                 padding: 8px 16px;
                 font-weight: 500;
                 min-height: 30px;
                 width: 100%;
             }
             QPushButton:hover {
-                background-color: #6c6c6c;
+                background-color:
             }
             QPushButton:pressed {
-                background-color: #4c4c4c;
-                border: 1px solid #333333;
+                background-color:
+                border: 1px solid
             }
             QLabel {
-                color: #f0f0f0;
+                color:
             }
             QScrollArea {
                 border: none;
-                background-color: #3c3c3c;
+                background-color:
             }
             QCheckBox {
-                spacing: 5px;
-                color: #f0f0f0;
+                spacin: 5px;
+                color:
             }
             QCheckBox::indicator {
                 width: 18px;
                 height: 18px;
             }
             QCheckBox::indicator:unchecked {
-                border: 2px solid #888888;
-                background-color: #3c3c3c;
+                border 2px solid
+                background-color:
             }
             QCheckBox::indicator:checked {
-                border: 2px solid #0078d7;
-                background-color: #0078d7;
+                border: 2px solid
+                background-color:
             }
         """
 
     def setupMainWidget(self):
         main_widget = QWidget()
-        main_layout = QVBoxLayout(main_widget)
+        main_layout = QVBoxLayout(main_widget)  # Corrected line
         main_layout.setContentsMargins(20, 20, 20, 20)
         main_layout.setSpacing(20)
         self.setCentralWidget(main_widget)
@@ -472,7 +476,6 @@ class ImageGeneratorGUI(QMainWindow):
                 col = 0
             self.gallery_layout.addWidget(preview, row, col)
 
-        # Ensure all widgets are visible
         for i in range(self.gallery_layout.count()):
             self.gallery_layout.itemAt(i).widget().show()
 
@@ -484,7 +487,7 @@ class ImageGeneratorGUI(QMainWindow):
         for i in reversed(range(self.gallery_layout.count())):
             widget = self.gallery_layout.itemAt(i).widget()
             if widget is not None:
-                widget.hide()  # Hide the widget instead of deleting it
+                widget.hide()
                 self.gallery_layout.removeWidget(widget)
 
     def center(self):
@@ -514,10 +517,15 @@ class ImageGeneratorGUI(QMainWindow):
                     counter += 1
                 urlretrieve(image_url, image_path)
 
-                if self.save_metadata_checkbox.isChecked():
+                if (
+                    self.save_metadata_checkbox is not None
+                    and self.save_metadata_checkbox.isChecked()
+                ):
                     self.add_metadata_to_image(
                         image_path, self.prompt_input.toPlainText()
                     )
+                else:
+                    print("Warning: save_metadata_checkbox is None or not checked")
 
                 new_image_paths.append(image_path)
             else:
@@ -540,7 +548,7 @@ class ImageGeneratorGUI(QMainWindow):
                     img.save(image_path, pnginfo=metadata)
                 elif img.format in ["JPEG", "WEBP"]:
                     exif = img.getexif()
-                    exif[0x9286] = prompt  # 0x9286 is the UserComment EXIF tag
+                    exif[0x9286] = prompt
                     img.save(image_path, exif=exif)
         except Exception as e:
             print(f"Error adding metadata to {image_path}: {str(e)}")
@@ -600,7 +608,13 @@ class ImageGeneratorGUI(QMainWindow):
         )
         self.settings.setValue("auto_save", self.auto_save_checkbox.isChecked())
         self.settings.setValue("save_directory", self.save_dir_input.text())
-        self.settings.setValue("save_metadata", self.save_metadata_checkbox.isChecked())
+
+        if self.save_metadata_checkbox is not None:
+            self.settings.setValue(
+                "save_metadata", self.save_metadata_checkbox.isChecked()
+            )
+        else:
+            print("Warning: save_metadata_checkbox is None")
 
     def choose_save_directory(self):
         dir_path = QFileDialog.getExistingDirectory(self, "Choose Save Directory")
