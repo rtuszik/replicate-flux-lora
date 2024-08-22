@@ -2,13 +2,40 @@ import os
 import time
 from urllib.request import urlretrieve
 from PyQt6.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLineEdit,
-    QPushButton, QLabel, QScrollArea, QGridLayout, QMessageBox, QComboBox,
-    QSpinBox, QDoubleSpinBox, QCheckBox, QFormLayout, QSizePolicy, QTextEdit,
-    QProgressBar, QFileDialog, QDialog, QStatusBar
+    QApplication,
+    QMainWindow,
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QLineEdit,
+    QPushButton,
+    QLabel,
+    QScrollArea,
+    QGridLayout,
+    QMessageBox,
+    QComboBox,
+    QSpinBox,
+    QDoubleSpinBox,
+    QCheckBox,
+    QFormLayout,
+    QSizePolicy,
+    QTextEdit,
+    QProgressBar,
+    QFileDialog,
+    QDialog,
+    QStatusBar,
 )
 from PyQt6.QtGui import QPixmap, QGuiApplication, QResizeEvent
-from PyQt6.QtCore import Qt, QThread, pyqtSignal, QSettings, QTimer, QRunnable, QThreadPool, QObject
+from PyQt6.QtCore import (
+    Qt,
+    QThread,
+    pyqtSignal,
+    QSettings,
+    QTimer,
+    QRunnable,
+    QThreadPool,
+    QObject,
+)
 import replicate
 from dotenv import load_dotenv
 from token_count import TokenCount
@@ -27,7 +54,7 @@ class ImageLoader(QRunnable):
     def run(self):
         images = []
         for filename in os.listdir(self.folder_path):
-            if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')):
+            if filename.lower().endswith((".png", ".jpg", ".jpeg", ".webp")):
                 file_path = os.path.join(self.folder_path, filename)
                 mod_time = os.path.getmtime(file_path)
                 images.append((file_path, mod_time))
@@ -46,7 +73,7 @@ class ImageGeneratorThread(QThread):
         try:
             output = replicate.run(
                 "lucataco/flux-dev-lora:a22c463f11808638ad5e2ebd582e07a469031f48dd567366fb4c6fdab91d614d",
-                input=self.params
+                input=self.params,
             )
             self.finished.emit(output)
         except Exception as e:
@@ -87,7 +114,7 @@ class ImageViewer(QDialog):
         self.initUI()
 
     def initUI(self):
-        self.setWindowTitle('Image Viewer')
+        self.setWindowTitle("Image Viewer")
         self.setGeometry(100, 100, 1920, 1080)
 
         layout = QVBoxLayout(self)
@@ -97,7 +124,7 @@ class ImageViewer(QDialog):
         self.image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.image_label)
 
-        self.save_button = QPushButton('Save Image', self)
+        self.save_button = QPushButton("Save Image", self)
         self.save_button.clicked.connect(self.saveImage)
         layout.addWidget(self.save_button)
 
@@ -113,7 +140,7 @@ class ImageViewer(QDialog):
             self.width(),
             self.height() - button_height,
             Qt.AspectRatioMode.KeepAspectRatio,
-            Qt.TransformationMode.SmoothTransformation
+            Qt.TransformationMode.SmoothTransformation,
         )
         self.image_label.setPixmap(scaled_pixmap)
 
@@ -122,7 +149,9 @@ class ImageViewer(QDialog):
         super().resizeEvent(event)
 
     def saveImage(self):
-        file_name, _ = QFileDialog.getSaveFileName(self, "Save Image", "", "Images (*.png *.jpg *.bmp)")
+        file_name, _ = QFileDialog.getSaveFileName(
+            self, "Save Image", "", "Images (*.png *.jpg *.bmp)"
+        )
         if file_name:
             self.original_pixmap.save(file_name)
 
@@ -131,7 +160,14 @@ class ImagePreviewWidget(QLabel):
         super().__init__(parent)
         self.original_pixmap = pixmap
         self.file_path = file_path
-        self.setPixmap(pixmap.scaled(300, 300, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
+        self.setPixmap(
+            pixmap.scaled(
+                300,
+                300,
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            )
+        )
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.setStyleSheet("""
             QLabel {
@@ -154,12 +190,13 @@ class ImagePreviewWidget(QLabel):
 class ImageGeneratorGUI(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.settings = QSettings("YourCompany", "ImageGenerator")
+        self.settings = QSettings("rtuszik", "Flux-Dev-Lora-GUI")
         self.threadpool = QThreadPool()
         self.current_thread = None
         self.is_grid_view = True
         self.initUI()
         self.loadSettings()
+        self.save_metadata_checkbox = None
         QTimer.singleShot(100, self.loadImagesAsync)
 
     def initUI(self):
@@ -169,7 +206,7 @@ class ImageGeneratorGUI(QMainWindow):
         self.setupRightPanel()
         self.setupBottomPanel()
         self.setupStatusBar()
-        self.setWindowTitle('Image Generator')
+        self.setWindowTitle("Image Generator")
         self.resize(1900, 800)
         self.setMinimumWidth(1600)
 
@@ -188,7 +225,6 @@ class ImageGeneratorGUI(QMainWindow):
                 padding: 5px;
                 color: #f0f0f0;
                 width: 100%;
-                caret-color: #ffffff;
             }
             QPushButton {
                 background-color: #5c5c5c;
@@ -259,9 +295,25 @@ class ImageGeneratorGUI(QMainWindow):
         form_layout = QFormLayout()
         form_layout.setSpacing(10)
         form_layout.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
-        form_layout.setFormAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+        form_layout.setFormAlignment(
+            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop
+        )
 
-        self.aspect_ratio_input = self.createComboBox(["1:1", "16:9", "21:9", "3:2", "2:3", "4:5", "5:4", "3:4", "4:3", "9:16", "9:21"])
+        self.aspect_ratio_input = self.createComboBox(
+            [
+                "1:1",
+                "16:9",
+                "21:9",
+                "3:2",
+                "2:3",
+                "4:5",
+                "5:4",
+                "3:4",
+                "4:3",
+                "9:16",
+                "9:21",
+            ]
+        )
         self.num_outputs_input = self.createSpinBox(1, 4)
         self.num_inference_steps_input = self.createSpinBox(1, 50)
         self.guidance_scale_input = self.createDoubleSpinBox(0, 10, 0.1)
@@ -288,15 +340,22 @@ class ImageGeneratorGUI(QMainWindow):
 
     def setupSaveSettings(self):
         self.auto_save_checkbox = QCheckBox("Auto-save")
+        self.save_metadata_checkbox = QCheckBox("Save prompt as metadata")
         self.save_dir_input = QLineEdit()
         self.save_dir_input.setReadOnly(True)
         self.choose_dir_button = QPushButton("Choose Directory")
         self.choose_dir_button.clicked.connect(self.choose_save_directory)
 
-        save_settings_layout = QHBoxLayout()
-        save_settings_layout.addWidget(self.auto_save_checkbox)
-        save_settings_layout.addWidget(self.save_dir_input)
-        save_settings_layout.addWidget(self.choose_dir_button)
+        save_settings_layout = QVBoxLayout()
+        checkbox_layout = QHBoxLayout()
+        checkbox_layout.addWidget(self.auto_save_checkbox)
+        checkbox_layout.addWidget(self.save_metadata_checkbox)
+        save_settings_layout.addLayout(checkbox_layout)
+
+        dir_layout = QHBoxLayout()
+        dir_layout.addWidget(self.save_dir_input)
+        dir_layout.addWidget(self.choose_dir_button)
+        save_settings_layout.addLayout(dir_layout)
 
         self.left_layout.addLayout(save_settings_layout)
 
@@ -310,22 +369,26 @@ class ImageGeneratorGUI(QMainWindow):
 
         self.right_layout.addWidget(self.gallery_scroll)
 
-        self.view_toggle = QPushButton('Toggle View')
+        self.view_toggle = QPushButton("Toggle View")
         self.view_toggle.clicked.connect(self.toggle_view)
         self.right_layout.addWidget(self.view_toggle)
 
     def setupBottomPanel(self):
         self.prompt_input = QTextEdit()
         self.prompt_input.setFixedHeight(100)
-        self.prompt_input.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.prompt_input.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
+        )
         self.bottom_layout.addWidget(QLabel("Prompt:"))
         self.bottom_layout.addWidget(self.prompt_input)
 
         self.token_counter = TokenCounter(self.prompt_input)
         self.bottom_layout.addWidget(self.token_counter)
 
-        self.generate_button = QPushButton('Generate Images')
-        self.generate_button.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.generate_button = QPushButton("Generate Images")
+        self.generate_button.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
+        )
         self.generate_button.setFixedHeight(50)
         self.generate_button.clicked.connect(self.generate_images)
         self.bottom_layout.addWidget(self.generate_button)
@@ -336,7 +399,7 @@ class ImageGeneratorGUI(QMainWindow):
         self.progress_bar.hide()
         self.bottom_layout.addWidget(self.progress_bar)
 
-        self.interrupt_button = QPushButton('Interrupt Generation')
+        self.interrupt_button = QPushButton("Interrupt Generation")
         self.interrupt_button.clicked.connect(self.interrupt_generation)
         self.interrupt_button.setEnabled(False)
         self.bottom_layout
@@ -382,13 +445,19 @@ class ImageGeneratorGUI(QMainWindow):
 
     def updateGallery(self, image_paths=None):
         if image_paths is None:
-            image_paths = [self.gallery_layout.itemAt(i).widget().file_path
-                           for i in range(self.gallery_layout.count())]
+            image_paths = [
+                self.gallery_layout.itemAt(i).widget().file_path
+                for i in range(self.gallery_layout.count())
+            ]
 
-        sorted_images = sorted(image_paths, key=lambda x: os.path.getctime(x), reverse=True)
+        sorted_images = sorted(
+            image_paths, key=lambda x: os.path.getctime(x), reverse=True
+        )
 
-        existing_images = {self.gallery_layout.itemAt(i).widget().file_path
-                           for i in range(self.gallery_layout.count())}
+        existing_images = {
+            self.gallery_layout.itemAt(i).widget().file_path
+            for i in range(self.gallery_layout.count())
+        }
 
         images_to_add = [path for path in sorted_images if path not in existing_images]
 
@@ -407,7 +476,9 @@ class ImageGeneratorGUI(QMainWindow):
         for i in range(self.gallery_layout.count()):
             self.gallery_layout.itemAt(i).widget().show()
 
-        self.gallery_scroll.verticalScrollBar().setValue(self.gallery_scroll.verticalScrollBar().minimum())
+        self.gallery_scroll.verticalScrollBar().setValue(
+            self.gallery_scroll.verticalScrollBar().minimum()
+        )
 
     def clearGallery(self):
         for i in reversed(range(self.gallery_layout.count())):
@@ -442,6 +513,12 @@ class ImageGeneratorGUI(QMainWindow):
                     image_path = os.path.join(self.save_dir_input.text(), new_name)
                     counter += 1
                 urlretrieve(image_url, image_path)
+
+                if self.save_metadata_checkbox.isChecked():
+                    self.add_metadata_to_image(
+                        image_path, self.prompt_input.toPlainText()
+                    )
+
                 new_image_paths.append(image_path)
             else:
                 image_path = f"temp_image_{i}.{self.output_format_input.currentText()}"
@@ -454,36 +531,76 @@ class ImageGeneratorGUI(QMainWindow):
             for path in new_image_paths:
                 os.remove(path)
 
+    def add_metadata_to_image(self, image_path, prompt):
+        try:
+            with Image.open(image_path) as img:
+                if img.format == "PNG":
+                    metadata = PngInfo()
+                    metadata.add_text("prompt", prompt)
+                    img.save(image_path, pnginfo=metadata)
+                elif img.format in ["JPEG", "WEBP"]:
+                    exif = img.getexif()
+                    exif[0x9286] = prompt  # 0x9286 is the UserComment EXIF tag
+                    img.save(image_path, exif=exif)
+        except Exception as e:
+            print(f"Error adding metadata to {image_path}: {str(e)}")
+
     def loadSettings(self):
         self.prompt_input.setPlainText(self.settings.value("prompt", ""))
-        self.aspect_ratio_input.setCurrentText(self.settings.value("aspect_ratio", "1:1"))
+        self.aspect_ratio_input.setCurrentText(
+            self.settings.value("aspect_ratio", "1:1")
+        )
         self.num_outputs_input.setValue(int(self.settings.value("num_outputs", 1)))
-        self.num_inference_steps_input.setValue(int(self.settings.value("num_inference_steps", 28)))
-        self.guidance_scale_input.setValue(float(self.settings.value("guidance_scale", 3.5)))
+        self.num_inference_steps_input.setValue(
+            int(self.settings.value("num_inference_steps", 28))
+        )
+        self.guidance_scale_input.setValue(
+            float(self.settings.value("guidance_scale", 3.5))
+        )
         self.seed_input.setValue(int(self.settings.value("seed", -2147483648)))
-        self.output_format_input.setCurrentText(self.settings.value("output_format", "webp"))
-        self.output_quality_input.setValue(int(self.settings.value("output_quality", 80)))
+        self.output_format_input.setCurrentText(
+            self.settings.value("output_format", "webp")
+        )
+        self.output_quality_input.setValue(
+            int(self.settings.value("output_quality", 80))
+        )
         self.hf_lora_input.setText(self.settings.value("hf_lora", ""))
         self.lora_scale_input.setValue(float(self.settings.value("lora_scale", 0.8)))
-        self.disable_safety_checker_input.setChecked(self.settings.value("disable_safety_checker", True, type=bool))
-        self.auto_save_checkbox.setChecked(self.settings.value("auto_save", True, type=bool))
-        self.save_dir_input.setText(self.settings.value("save_directory", os.path.expanduser("~/Downloads/replicate")))
+        self.disable_safety_checker_input.setChecked(
+            self.settings.value("disable_safety_checker", True, type=bool)
+        )
+        self.auto_save_checkbox.setChecked(
+            self.settings.value("auto_save", True, type=bool)
+        )
+        self.save_dir_input.setText(
+            self.settings.value(
+                "save_directory", os.path.expanduser("~/Downloads/replicate")
+            )
+        )
+        self.save_metadata_checkbox.setChecked(
+            self.settings.value("save_metadata", False, type=bool)
+        )
         self.loadImagesAsync()
 
     def saveSettings(self):
         self.settings.setValue("prompt", self.prompt_input.toPlainText())
         self.settings.setValue("aspect_ratio", self.aspect_ratio_input.currentText())
         self.settings.setValue("num_outputs", self.num_outputs_input.value())
-        self.settings.setValue("num_inference_steps", self.num_inference_steps_input.value())
+        self.settings.setValue(
+            "num_inference_steps", self.num_inference_steps_input.value()
+        )
         self.settings.setValue("guidance_scale", self.guidance_scale_input.value())
         self.settings.setValue("seed", self.seed_input.value())
         self.settings.setValue("output_format", self.output_format_input.currentText())
         self.settings.setValue("output_quality", self.output_quality_input.value())
         self.settings.setValue("hf_lora", self.hf_lora_input.text())
         self.settings.setValue("lora_scale", self.lora_scale_input.value())
-        self.settings.setValue("disable_safety_checker", self.disable_safety_checker_input.isChecked())
+        self.settings.setValue(
+            "disable_safety_checker", self.disable_safety_checker_input.isChecked()
+        )
         self.settings.setValue("auto_save", self.auto_save_checkbox.isChecked())
         self.settings.setValue("save_directory", self.save_dir_input.text())
+        self.settings.setValue("save_metadata", self.save_metadata_checkbox.isChecked())
 
     def choose_save_directory(self):
         dir_path = QFileDialog.getExistingDirectory(self, "Choose Save Directory")
@@ -503,7 +620,7 @@ class ImageGeneratorGUI(QMainWindow):
             "output_quality": self.output_quality_input.value(),
             "hf_lora": self.hf_lora_input.text(),
             "lora_scale": self.lora_scale_input.value(),
-            "disable_safety_checker": self.disable_safety_checker_input.isChecked()
+            "disable_safety_checker": self.disable_safety_checker_input.isChecked(),
         }
 
         if self.seed_input.value() != self.seed_input.minimum():
@@ -546,7 +663,7 @@ class ImageGeneratorGUI(QMainWindow):
         self.saveSettings()
         super().closeEvent(event)
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     app = QApplication([])
     ex = ImageGeneratorGUI()
     ex.show()
