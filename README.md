@@ -1,31 +1,28 @@
-# Image Generator GUI
+# Flux Replicate GUI
 
-## Overview
-The Image Generator GUI is a Python application that provides a user-friendly interface for generating images using the [LucaTaco Flux-Dev LoRA explorer](https://replicate.com/lucataco/flux-dev-lora/readme) via Replicate. This tool allows users to input prompts, adjust various parameters, and generate high-quality images with ease.
+This application provides a user-friendly web interface for running Flux1 models using the Replicate API. It's designed specifically for users who want to utilize LoRAs (Low-Rank Adaptations) of Flux created with the [ostris/flux-dev-lora-trainer](https://replicate.com/ostris/flux-dev-lora-trainer/train).
 
 ## Features
-- Intuitive graphical user interface
-- Real-time token counting with warnings for exceeding token limits
-- Customizable image generation parameters:
-  - Aspect ratio
-  - Number of outputs
-  - Inference steps
-  - Guidance scale
-  - Seed
-  - Output format and quality
-- Support for custom LoRA models
-- Image preview with full-size viewing capability
-- Option to automatically save generated images
-- Persistent settings between sessions
-- Toggle between grid and list view for generated images
-- Ability to interrupt ongoing image generation
+
+- Web-based GUI for easy interaction with Flux1 LoRAs
+- Integration with Replicate API for model execution
+- Support for custom LoRAs trained with flux-dev-lora-trainer
+- Ability to disable the Safety Checker (API-exclusive feature)
+- Customizable image generation parameters
+- Image gallery for viewing generated images
+- Settings persistence for a smoother user experience
+
+## Prerequisites
+
+- Python 3.7+
+- Replicate API key
 
 ## Installation
 
 1. Clone this repository:
    ```
-   git clone https://github.com/rtuszik/flux-dev-lora-python.git
-   cd flux-dev-lora-python
+   git clone https://github.com/yourusername/flux-replicate-gui.git
+   cd flux-replicate-gui
    ```
 
 2. Install the required dependencies:
@@ -33,44 +30,54 @@ The Image Generator GUI is a Python application that provides a user-friendly in
    pip install -r requirements.txt
    ```
 
-3. Set up your Replicate API key:
-   - Create a `.env` file in the project root
-   - Add your Replicate API key: `REPLICATE_API_TOKEN=your_api_key_here`
+3. Set up your Replicate API key as an environment variable:
+   ```
+   export REPLICATE_API_TOKEN=your_api_key_here
+   ```
 
 ## Usage
 
 1. Run the application:
    ```
-   python3 FluxLoraGUI.py
+   python3 main.py
    ```
 
-2. Enter your prompt in the text box.
-3. Adjust the generation parameters as desired.
-4. Click "Generate Images" to create your images.
-5. Click on the generated thumbnails to view them in full size.
-6. Use the "Toggle View" button to switch between grid and list views of the gallery.
-7. The "Interrupt Generation" button allows you to stop the image generation process if needed.
+2. Open your web browser and navigate to `http://localhost:8080`
 
-## About the Replicate Model
+3. In the GUI:
+   - Enter your Replicate model URL
+   - Set your desired parameters (aspect ratio, number of outputs, etc.)
+   - Enter your prompt
+   - Click "Generate Images"
 
-This application uses the Flux-Dev LoRA model implemented via Huggingface Diffusers. Key points about the model:
+4. View your generated images in the gallery
 
-- Supports various LoRAs, including Dreambooth and Style LoRAs.
-- Allows use of custom LoRAs by providing a Huggingface path or URL.
+## Key Components
 
-## Contributing
+- `main.py`: Entry point of the application
+- `gui.py`: Defines the web interface using NiceGUI
+- `image_generator.py`: Handles image generation using the Replicate API
+- `utils.py`: Contains utility classes and functions
 
-Contributions to improve the Image Generator GUI are welcome. Please feel free to submit pull requests or open issues for bugs and feature requests.
+## Customization
 
-## Troubleshooting
+You can modify various parameters in the GUI, including:
 
-If you encounter any issues:
-1. Ensure your Replicate API key is correctly set in the `.env` file.
-2. Check that all dependencies are installed correctly.
-3. Verify that you have a stable internet connection.
+- Flux model selection (dev or schnell)
+- Aspect ratio
+- Number of outputs
+- LoRA scale
+- Number of inference steps
+- Guidance scale
+- Output format and quality
+- Safety checker toggle
 
-For persistent problems, please open an issue on the GitHub repository.
+## Training Your Own Models
 
----
+To train your own models for use with this GUI, please refer to the Replicate guide on fine-tuning Flux:
 
-For more information on training LoRAs or using the Flux model, please refer to the [official Flux LoRA trainer model](https://replicate.com/lucataco/flux-dev-lora).
+[Fine-tune Flux: Create your own image generation model](https://replicate.com/blog/fine-tune-flux)
+
+## License
+
+[GNU GPLv3e](LICENSE)
