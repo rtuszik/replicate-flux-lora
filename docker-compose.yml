@@ -1,7 +1,7 @@
 
 services:
   flux-replicate-gui:
-    image: ghcr.io/rtuszik:
+    image: ghcr.io/rtuszik/flux-dev-lora-python:main
     container_name: flux-replicate-gui
     environment:
       - REPLICATE_API_TOKEN=${REPLICATE_API_TOKEN}
