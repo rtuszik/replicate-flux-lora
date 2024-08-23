@@ -63,7 +63,7 @@ class ImageGeneratorGUI:
         with ui.column().classes("w-full max-w-7xl mx-auto p-4 space-y-4"):
             with ui.card().classes("w-full"):
                 ui.label("Image Generator").classes("text-2xl font-bold mb-4")
-                with ui.row().classes("w-full justify-between"):
+                with ui.row().classes("w-full"):
                     with ui.column().classes("w-1/2 pr-2"):
                         self.setup_left_panel()
                     with ui.column().classes("w-1/2 pl-2"):

@@ -1,0 +1,12 @@
+
+services:
+  flux-replicate-gui:
+    image: ghcr.io/rtuszik:
+    container_name: flux-replicate-gui
+    environment:
+      - REPLICATE_API_TOKEN=${REPLICATE_API_TOKEN}
+    ports:
+      - "8080:8080"
+    volumes:
+      - ${HOST_OUTPUT_DIR}:/app/output
+    restart: unless-stopped
