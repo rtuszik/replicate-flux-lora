@@ -1,7 +1,6 @@
-from PyQt6.QtWidgets import QApplication
-
 from gui import ImageGeneratorGUI
 from image_generator import ImageGenerator
+from PyQt6.QtWidgets import QApplication
 
 
 def main():

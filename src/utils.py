@@ -1,9 +1,12 @@
 import os
-from PyQt6.QtCore import QRunnable, QThread, pyqtSignal, QObject
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel
+
+from PyQt6.QtCore import QObject, QRunnable, QThread, pyqtSignal
+from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
+
 
 class ImageLoaderSignals(QObject):
     finished = pyqtSignal(list)
+
 
 class ImageLoader(QRunnable):
     def __init__(self, folder_path):
@@ -21,6 +24,7 @@ class ImageLoader(QRunnable):
         images.sort(key=lambda x: x[1], reverse=True)
         self.signals.finished.emit([img[0] for img in images])
 
+
 class ImageGeneratorThread(QThread):
     finished = pyqtSignal(list)
     error = pyqtSignal(str)
@@ -37,6 +41,7 @@ class ImageGeneratorThread(QThread):
         except Exception as e:
             self.error.emit(str(e))
 
+
 class TokenCount:
     def __init__(self, model_name):
         self.model_name = model_name
@@ -44,6 +49,7 @@ class TokenCount:
     def num_tokens_from_string(self, string: str) -> int:
         # This is a simplified implementation. You might want to use a proper tokenizer here.
         return len(string.split())
+
 
 class TokenCounter(QWidget):
     def __init__(self, text_edit, *args, **kwargs):

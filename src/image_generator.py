@@ -3,9 +3,10 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
 class ImageGenerator:
     def __init__(self):
-        self.model = "rtuszik/fluxlyptus:4e304b52ad6745623fb29f3250d89df23ac38b42734887d9e0a4b3a31c648472"
+        self.model = "rtuszik/fluxlyptus:b23b9b488de7af95eba09786ef3156d345d979024712f54b3e5a32d61f14e568"
 
     def generate_images(self, params):
         try:
@@ -13,6 +14,7 @@ class ImageGenerator:
             return output
         except Exception as e:
             raise ImageGenerationError(f"Error generating images: {str(e)}")
+
 
 class ImageGenerationError(Exception):
     pass

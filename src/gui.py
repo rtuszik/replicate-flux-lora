@@ -27,7 +27,6 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-
 from utils import ImageGeneratorThread, ImageLoader, TokenCounter
 
 
