@@ -6,15 +6,6 @@ ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
-RUN adduser \
-    --disabled-password \
-    --gecos "" \
-    --home "/nonexistent" \
-    --shell "/sbin/nologin" \
-    --no-create-home \
-    --uid "${UID}" \
-    appuser
-
 COPY requirements.txt .
 
 RUN --mount=type=cache,target=/root/.cache/pip \
