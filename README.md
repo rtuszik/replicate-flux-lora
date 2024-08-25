@@ -55,7 +55,7 @@ A simple web interface for running Flux models using the Replicate API. Use it t
 ```yaml
 services:
   replicate-flux-lora:
-    image: ghcr.io/rtuszik/replicate-flux-lora
+    image: ghcr.io/rtuszik/replicate-flux-lora:latest
     container_name: replicate-flux-lora
     environment:
       - REPLICATE_API_TOKEN=${REPLICATE_API_TOKEN}
