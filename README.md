@@ -1,83 +1,72 @@
 # Flux Replicate GUI
 
-This application provides a user-friendly web interface for running Flux1 models using the Replicate API. It's designed specifically for users who want to utilize LoRAs (Low-Rank Adaptations) of Flux created with the [ostris/flux-dev-lora-trainer](https://replicate.com/ostris/flux-dev-lora-trainer/train).
+A simple web interface for running Flux models using the Replicate API. Use it to generate images with custom LoRAs and fine-tuned Flux models.
 
-## Features
+## What it does
 
-- Web-based GUI for easy interaction with Flux1 LoRAs
-- Integration with Replicate API for model execution
-- Support for custom LoRAs trained with flux-dev-lora-trainer
-- Ability to disable the Safety Checker (API-exclusive feature)
-- Customizable image generation parameters
-- Image gallery for viewing generated images
-- Settings persistence for a smoother user experience
+- Runs Flux models via Replicate API
+- Lets you use custom LoRAs and fine-tuned models
+- Allows disabling the Safety Checker
+- Saves your settings
+- Shows generated images in a gallery
 
-## Prerequisites
+## Setup
 
-- Python 3.7+
-- Replicate API key
-
-## Installation
-
-1. Clone this repository:
+1. Clone the repo:
    ```
    git clone https://github.com/yourusername/flux-replicate-gui.git
    cd flux-replicate-gui
    ```
 
-2. Install the required dependencies:
+2. Create and activate a virtual environment:
+   ```
+   python -m venv venv
+   source venv/bin/activate  # On Windows, use `venv\Scripts\activate`
+   ```
+
+3. Install dependencies:
    ```
    pip install -r requirements.txt
    ```
 
-3. Set up your Replicate API key as an environment variable:
+4. Set your Replicate API key:
    ```
    export REPLICATE_API_TOKEN=your_api_key_here
    ```
+   On Windows, use `set REPLICATE_API_TOKEN=your_api_key_here`
 
-## Usage
+## Run it
 
-1. Run the application:
+1. Make sure your virtual environment is activated
+
+2. Start the app:
    ```
-   python3 main.py
+   python main.py
    ```
 
-2. Open your web browser and navigate to `http://localhost:8080`
+3. Open `http://localhost:8080` in your browser
 
-3. In the GUI:
-   - Enter your Replicate model URL
-   - Set your desired parameters (aspect ratio, number of outputs, etc.)
-   - Enter your prompt
-   - Click "Generate Images"
+4. Choose a model, set your options, enter a prompt, and generate images
+## Docker
 
-4. View your generated images in the gallery
+**Docker is currently experimental.**
 
-## Key Components
+To run the app in a Docker container, follow these steps:
 
-- `main.py`: Entry point of the application
-- `gui.py`: Defines the web interface using NiceGUI
-- `image_generator.py`: Handles image generation using the Replicate API
-- `utils.py`: Contains utility classes and functions
+1. Make sure you have Docker installed on your system.
+2. Build the Docker image:
+   ```
+   docker build -t flux-replicate-gui .
+   ```
+   Run the Docker container:
+   ```
+   docker run -p 8080:8080 flux-replicate-gui
+   ```
+   Open `http://localhost:8080` in your browser
 
-## Customization
 
-You can modify various parameters in the GUI, including:
 
-- Flux model selection (dev or schnell)
-- Aspect ratio
-- Number of outputs
-- LoRA scale
-- Number of inference steps
-- Guidance scale
-- Output format and quality
-- Safety checker toggle
+## Need help?
 
-## Training Your Own Models
-
-To train your own models for use with this GUI, please refer to the Replicate guide on fine-tuning Flux:
-
-[Fine-tune Flux: Create your own image generation model](https://replicate.com/blog/fine-tune-flux)
-
-## License
-
-[GNU GPLv3e](LICENSE)
+Check out Replicate's guide on fine-tuning Flux:
+https://replicate.com/blog/fine-tune-flux
