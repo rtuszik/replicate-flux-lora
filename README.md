@@ -22,17 +22,16 @@ Docker is the recommended way to run this application. It ensures consistent env
 ### Docker Compose Setup
 1. Create a `docker-compose.yml` file with the following content:
    ```yaml
-   services:
-     replicate-flux-lora:
-       image: ghcr.io/rtuszik/replicate-flux-lora:latest
-       container_name: replicate-flux-lora
-       environment:
-         - REPLICATE_API_TOKEN=${REPLICATE_API_TOKEN}
-       ports:
-         - "8080:8080"
-       volumes:
-         - ${HOST_OUTPUT_DIR}:/app/output
-       restart: unless-stopped
+  services:
+    replicate-flux-lora:
+      image: ghcr.io/rtuszik/replicate-flux-lora:latest
+      container_name: replicate-flux-lora
+      env_file: .env
+      ports:
+        - "8080:8080"
+      volumes:
+        - ${HOST_OUTPUT_DIR}:/app/output
+      restart: unless-stopped
    ```
 
 2. Create a `.env` file in the same directory with the following content:

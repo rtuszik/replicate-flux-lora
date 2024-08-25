@@ -3,8 +3,7 @@ services:
   replicate-flux-lora:
     image: ghcr.io/rtuszik/replicate-flux-lora:latest
     container_name: replicate-flux-lora
-    environment:
-      - REPLICATE_API_TOKEN=${REPLICATE_API_TOKEN}
+    env_file: .env
     ports:
       - "8080:8080"
     volumes:
