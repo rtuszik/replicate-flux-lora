@@ -3,6 +3,7 @@ FROM python:3.11-slim
 # Environment variables to optimize Python behavior
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+ENV DOCKER_CONTAINER=True
 
 # Set the working directory
 WORKDIR /app

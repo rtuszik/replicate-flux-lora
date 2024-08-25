@@ -17,6 +17,8 @@ logger.add(
 )
 logger.add("gui.log", rotation="10 MB", format="{time} {level} {message}", level="INFO")
 
+DOCKERIZED = os.environ.get("DOCKER_CONTAINER", False)
+
 
 class Lightbox:
     def __init__(self):
@@ -100,9 +102,13 @@ class ImageGeneratorGUI:
             "w-full"
         )
 
-        self.folder_path = self.settings.get(
-            "output_folder", str(Path.home() / "Downloads")
-        )
+        if DOCKERIZED:
+            self.folder_path = self.settings.get("output_folder", str("/app/output"))
+        else:
+            self.folder_path = self.settings.get(
+                "output_folder", str(Path.home() / "Downloads")
+            )
+
         self.folder_input = ui.input(
             label="Output Folder", value=self.folder_path
         ).classes("w-full")
@@ -244,9 +250,9 @@ class ImageGeneratorGUI:
             self.user_models_select.options = self.user_added_models
             self.new_model_input.value = ""
             self.save_settings()
-            ui.notify(f"Model '{new_model}' added successfully", type="success")
+            ui.notify(f"Model '{new_model}' added successfully", type="positive")
         else:
-            ui.notify("Invalid model name or model already exists", type="error")
+            ui.notify("Invalid model name or model already exists", type="negative")
 
     def delete_user_model(self):
         selected_model = self.user_models_select.value
@@ -255,9 +261,9 @@ class ImageGeneratorGUI:
             self.user_models_select.options = self.user_added_models
             self.user_models_select.value = None
             self.save_settings()
-            ui.notify(f"Model '{selected_model}' deleted successfully", type="success")
+            ui.notify(f"Model '{selected_model}' deleted successfully", type="positive")
         else:
-            ui.notify("No model selected for deletion", type="error")
+            ui.notify("No model selected for deletion", type="negative")
 
     def select_user_model(self, e):
         if e.value:
@@ -271,15 +277,15 @@ class ImageGeneratorGUI:
             self.folder_path = new_path
             self.save_settings()
             logger.info(f"Output folder set to: {self.folder_path}")
-            ui.notify(f"Output folder updated to: {self.folder_path}", type="success")
+            ui.notify(f"Output folder updated to: {self.folder_path}", type="positive")
         else:
             ui.notify(
-                "Invalid folder path. Please enter a valid directory.", type="error"
+                "Invalid folder path. Please enter a valid directory.", type="negative"
             )
             self.folder_input.value = self.folder_path
 
     def setup_right_panel(self):
-        self.spinner = ui.spinner(size="lg")
+        self.spinner = ui.spinner(type="infinity", size="xl")
         self.spinner.visible = False
 
         # Add gallery view
@@ -328,7 +334,8 @@ class ImageGeneratorGUI:
     async def start_generation(self):
         if not self.replicate_model_input.value:
             ui.notify(
-                "Please set a Replicate model before generating images.", type="error"
+                "Please set a Replicate model before generating images.",
+                type="negative",
             )
             logger.warning(
                 "Attempted to generate images without setting a Replicate model"
@@ -372,7 +379,7 @@ class ImageGeneratorGUI:
             logger.success(f"Images generated successfully: {output}")
         except Exception as e:
             error_message = f"An error occurred: {str(e)}"
-            ui.notify(error_message, type="error")
+            ui.notify(error_message, type="negative")
             logger.exception(error_message)
         finally:
             self.generate_button.enable()
@@ -398,7 +405,7 @@ class ImageGeneratorGUI:
                     logger.error(f"Failed to download image from {url}")
 
         self.update_gallery(downloaded_images)
-        ui.notify("Images generated and downloaded successfully!", type="success")
+        ui.notify("Images generated and downloaded successfully!", type="positive")
 
     def update_gallery(self, image_paths):
         self.gallery_container.clear()
