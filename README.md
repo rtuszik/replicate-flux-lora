@@ -8,7 +8,49 @@ A simple web interface for running Flux models using the Replicate API. Use it t
 - Saves your settings
 - Shows generated images in a gallery
 
-## Setup
+## Recommended Setup: Docker
+Docker is the recommended way to run this application. It ensures consistent environment across different systems.
+
+### Prerequisites
+- Docker and Docker Compose installed on your system
+- Replicate API key
+
+### Docker Compose Setup
+1. Create a `docker-compose.yml` file with the following content:
+   ```yaml
+   services:
+     replicate-flux-lora:
+       image: ghcr.io/rtuszik/replicate-flux-lora:latest
+       container_name: replicate-flux-lora
+       environment:
+         - REPLICATE_API_TOKEN=${REPLICATE_API_TOKEN}
+       ports:
+         - "8080:8080"
+       volumes:
+         - ${HOST_OUTPUT_DIR}:/app/output
+       restart: unless-stopped
+   ```
+
+2. Create a `.env` file in the same directory with the following content:
+   ```
+   REPLICATE_API_TOKEN=your_api_key_here
+   HOST_OUTPUT_DIR=/path/to/your/output/directory
+   ```
+   Replace `your_api_key_here` with your actual Replicate API key and `/path/to/your/output/directory` with the directory on your host machine where you want to save generated images.
+
+### Running with Docker
+1. Start the application:
+   ```
+   docker-compose up -d
+   ```
+
+2. Open `http://localhost:8080` in your browser
+
+3. Choose a model, set your options, enter a prompt, and generate images
+
+## Alternative Setup: Local Python Environment
+If you prefer to run the application without Docker, you can use a local Python environment.
+
 1. Clone the repo:
    ```
    git clone https://github.com/rtuszik/replicate-flux-lora.git
@@ -36,37 +78,12 @@ A simple web interface for running Flux models using the Replicate API. Use it t
      REPLICATE_API_TOKEN=your_api_key_here
      ```
 
-## Run it
-1. Make sure your virtual environment is activated
-
-2. Start the app:
+5. Run the application:
    ```
    python main.py
    ```
 
-3. Open `http://localhost:8080` in your browser
-
-4. Choose a model, set your options, enter a prompt, and generate images
-
-## Docker
-**Docker is currently experimental.**
-
-### Docker Compose
-```yaml
-services:
-  replicate-flux-lora:
-    image: ghcr.io/rtuszik/replicate-flux-lora:latest
-    container_name: replicate-flux-lora
-    environment:
-      - REPLICATE_API_TOKEN=${REPLICATE_API_TOKEN}
-    ports:
-      - "8080:8080"
-    volumes:
-      - ${HOST_OUTPUT_DIR}:/app/output
-    restart: unless-stopped
-```
-Replace `${REPLICATE_API_TOKEN}` with your actual Replicate API key.
-Replace `${HOST_OUTPUT_DIR}` with the directory on your host machine where you want to save generated images.
+6. Open `http://localhost:8080` in your browser
 
 ## Need help?
 Check out Replicate's guide on fine-tuning Flux:

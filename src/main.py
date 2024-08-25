@@ -30,4 +30,5 @@ async def main_page():
 
 # Run the NiceGUI server
 logger.info("Starting NiceGUI server")
-ui.run(port=8080)
+# ui.run(port=8080)
+ui.run(title="Replicate Flux LoRA", port=8080)
