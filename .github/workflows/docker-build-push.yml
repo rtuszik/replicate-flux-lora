@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - main
+    paths:
+      - src/**
+      - Dockerfile
 
 env:
   REGISTRY: ghcr.io
@@ -35,6 +38,12 @@ jobs:
         tags: |
           type=raw,value=latest
           type=sha,prefix={{branch}}-
+          type=ref,event=branch
+          type=semver,pattern={{version}}
+        labels: |
+          org.opencontainers.image.source=${{ github.repositoryUrl }}
+          org.opencontainers.image.revision=${{ github.sha }}
+          org.opencontainers.image.created=${{ steps.meta.outputs.created }}
 
     - name: Build and push Docker image
       uses: docker/build-push-action@v4
@@ -43,3 +52,5 @@ jobs:
         push: true
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
