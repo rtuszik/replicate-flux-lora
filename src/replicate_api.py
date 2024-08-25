@@ -8,12 +8,12 @@ from loguru import logger
 load_dotenv()
 
 # Configure Loguru
-logger.remove()  # Remove the default handler
+logger.remove()
 logger.add(
     sys.stderr, format="{time} {level} {message}", filter="my_module", level="INFO"
 )
 logger.add(
-    "image_generator.log",
+    "replicate.log",
     rotation="10 MB",
     format="{time} {level} {message}",
     level="INFO",
@@ -57,6 +57,15 @@ class ImageGenerator:
             error_message = f"Error generating images: {str(e)}"
             logger.exception(error_message)
             raise ImageGenerationError(error_message)
+
+    def get_flux_fine_tune_models(self):
+        try:
+            collection = replicate.collections.get("flux-fine-tunes")
+            models = collection.models
+            return [model.name for model in models]
+        except Exception as e:
+            logger.error(f"Error fetching flux-fine-tunes models: {str(e)}")
+            return []
 
 
 class ImageGenerationError(Exception):

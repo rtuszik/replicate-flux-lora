@@ -1,9 +1,9 @@
 import sys
 
 from gui import create_gui
-from image_generator import ImageGenerator
 from loguru import logger
 from nicegui import ui
+from replicate_api import ImageGenerator
 
 # Configure Loguru
 logger.remove()  # Remove the default handler
