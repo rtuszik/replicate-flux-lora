@@ -1,3 +1,6 @@
+![Super-Linter](https://github.com/rtuszik/replicate-flux-lora/actions/workflows/super-linter.yml/badge.svg)
+![GitHub tag check runs](https://img.shields.io/github/check-runs/rtuszik/replicate-flux-lora/latest)
+
 # Flux Replicate GUI
 A simple web interface for running Flux models using the Replicate API. Use it to generate images with custom LoRAs and fine-tuned Flux models.
 
