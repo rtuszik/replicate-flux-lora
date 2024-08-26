@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - main
+    paths:
+      - src/**
+      - Dockerfile
 
 env:
   REGISTRY: ghcr.io
@@ -35,6 +38,8 @@ jobs:
         tags: |
           type=raw,value=latest
           type=sha,prefix={{branch}}-
+          type=ref,event=branch
+
 
     - name: Build and push Docker image
       uses: docker/build-push-action@v4
@@ -43,3 +48,5 @@ jobs:
         push: true
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max

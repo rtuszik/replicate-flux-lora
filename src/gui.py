@@ -10,8 +10,7 @@ import httpx
 from loguru import logger
 from nicegui import events, ui
 
-# Configure Loguru
-logger.remove()  # Remove the default handler
+logger.remove()
 logger.add(
     sys.stderr, format="{time} {level} {message}", filter="my_module", level="INFO"
 )
@@ -57,36 +56,67 @@ class ImageGeneratorGUI:
         self.load_settings()
         self.flux_fine_tune_models = self.image_generator.get_flux_fine_tune_models()
         self.user_added_models = self.settings.get("user_added_models", [])
+
+        self._attributes = [
+            "prompt",
+            "flux_model",
+            "aspect_ratio",
+            "num_outputs",
+            "lora_scale",
+            "num_inference_steps",
+            "guidance_scale",
+            "output_format",
+            "output_quality",
+            "disable_safety_checker",
+            "width",
+            "height",
+            "seed",
+        ]
+
+        for attr in self._attributes:
+            setattr(self, attr, self.settings.get(attr, None))
+
         self.setup_ui()
         logger.info("ImageGeneratorGUI initialized")
+
+    def __getattr__(self, name):
+        if name in self._attributes:
+            return self.__dict__.get(name, None)
+        return super().__getattribute__(name)
 
     def setup_ui(self):
         ui.dark_mode().enable()
 
-        with ui.column().classes("w-full max-w-full mx-auto p-4 space-y-4"):
+        with ui.column().classes("w-full max-w-full mx-auto space-y-8"):
             with ui.card().classes("w-full"):
-                ui.label("Image Generator").classes("text-2xl font-bold mb-4")
-                with ui.row().classes("w-full"):
-                    with ui.column().classes("w-1/2 pr-2"):
+                ui.label("Flux LoRA API").classes("text-2xl font-bold mb-4")
+                with ui.row():
+                    with ui.column(wrap=False):
                         self.setup_left_panel()
-                    with ui.column().classes("w-1/2 pl-2"):
+                    with ui.column(wrap=False):
                         self.setup_right_panel()
+                ui.separator()
                 self.setup_bottom_panel()
         logger.info("UI setup completed")
 
     def setup_left_panel(self):
-        self.replicate_model_input = ui.input(
-            "Replicate Model", value=self.settings.get("replicate_model", "")
-        ).classes("w-full")
+        self.replicate_model_input = (
+            ui.input("Replicate Model", value=self.settings.get("replicate_model", ""))
+            .classes("w-full")
+            .tooltip("Enter the Replicate model URL or identifier")
+        )
         self.replicate_model_input.on("change", self.update_replicate_model)
 
-        self.flux_models_select = ui.select(
-            options=self.flux_fine_tune_models,
-            label="Flux Fine-Tune Models",
-            value=None,
-            on_change=self.select_flux_model,
-        ).classes("w-full")
-
+        self.flux_models_select = (
+            ui.select(
+                options=self.flux_fine_tune_models,
+                label="Flux Fine-Tune Models",
+                value=None,
+                on_change=self.select_flux_model,
+            )
+            .classes("w-full")
+            .tooltip("Select Model")
+        )
         with ui.row().classes("w-full"):
             self.new_model_input = ui.input(label="New Model").classes("w-3/4")
             ui.button("Add Model", on_click=self.add_user_model).classes("w-1/4")
@@ -121,6 +151,9 @@ class ImageGeneratorGUI:
                 value=self.settings.get("flux_model", "dev"),
             )
             .classes("w-full")
+            .tooltip(
+                "Which model to run inferences with. the dev model needs around 28 steps but the schnell model only needs around 4 steps."
+            )
             .bind_value(self, "flux_model")
         )
 
@@ -145,6 +178,9 @@ class ImageGeneratorGUI:
             )
             .classes("w-full")
             .bind_value(self, "aspect_ratio")
+            .tooltip(
+                "Width of the generated image. Optional, only used when aspect_ratio=custom. Must be a multiple of 16 (if it's not, it will be rounded to nearest multiple of 16)"
+            )
         )
         self.aspect_ratio_select.on("change", self.toggle_custom_dimensions)
 
@@ -157,6 +193,9 @@ class ImageGeneratorGUI:
                 )
                 .classes("w-full")
                 .bind_value(self, "width")
+                .tooltip(
+                    "Width of the generated image. Optional, only used when aspect_ratio=custom. Must be a multiple of 16 (if it's not, it will be rounded to nearest multiple of 16)"
+                )
             )
             self.height_input = (
                 ui.number(
@@ -164,6 +203,9 @@ class ImageGeneratorGUI:
                 )
                 .classes("w-full")
                 .bind_value(self, "height")
+                .tooltip(
+                    "Height of the generated image. Optional, only used when aspect_ratio=custom. Must be a multiple of 16 (if it's not, it will be rounded to nearest multiple of 16)"
+                )
             )
 
         self.num_outputs_input = (
@@ -172,6 +214,7 @@ class ImageGeneratorGUI:
             )
             .classes("w-full")
             .bind_value(self, "num_outputs")
+            .tooltip("Number of images to output.")
         )
         self.lora_scale_input = (
             ui.number(
@@ -182,6 +225,9 @@ class ImageGeneratorGUI:
                 step=0.1,
             )
             .classes("w-full")
+            .tooltip(
+                "Determines how strongly the LoRA should be applied. Sane results between 0 and 1."
+            )
             .bind_value(self, "lora_scale")
         )
         self.num_inference_steps_input = (
@@ -192,6 +238,7 @@ class ImageGeneratorGUI:
                 max=50,
             )
             .classes("w-full")
+            .tooltip("Number of Inference Steps")
             .bind_value(self, "num_inference_steps")
         )
         self.guidance_scale_input = (
@@ -203,6 +250,7 @@ class ImageGeneratorGUI:
                 step=0.1,
             )
             .classes("w-full")
+            .tooltip("Guidance Scale for the diffusion process")
             .bind_value(self, "guidance_scale")
         )
         self.seed_input = (
@@ -222,6 +270,7 @@ class ImageGeneratorGUI:
                 value=self.settings.get("output_format", "webp"),
             )
             .classes("w-full")
+            .tooltip("Format of the output images")
             .bind_value(self, "output_format")
         )
         self.output_quality_input = (
@@ -232,14 +281,18 @@ class ImageGeneratorGUI:
                 max=100,
             )
             .classes("w-full")
+            .tooltip(
+                "Quality when saving the output images, from 0 to 100. 100 is best quality, 0 is lowest quality. Not relevant for .png outputs"
+            )
             .bind_value(self, "output_quality")
         )
         self.disable_safety_checker_switch = (
             ui.switch(
                 "Disable Safety Checker",
-                value=self.settings.get("disable_safety_checker", False),
+                value=self.settings.get("disable_safety_checker", True),
             )
             .classes("w-full")
+            .tooltip("Disable safety checker for generated images.")
             .bind_value(self, "disable_safety_checker")
         )
 
@@ -288,7 +341,6 @@ class ImageGeneratorGUI:
         self.spinner = ui.spinner(type="infinity", size="xl")
         self.spinner.visible = False
 
-        # Add gallery view
         self.gallery_container = ui.column().classes("w-full mt-4")
         self.lightbox = Lightbox()
 
@@ -297,6 +349,7 @@ class ImageGeneratorGUI:
             ui.textarea("Prompt", value=self.settings.get("prompt", ""))
             .classes("w-full")
             .bind_value(self, "prompt")
+            .props("clearable")
         )
         self.generate_button = ui.button(
             "Generate Images", on_click=self.start_generation
@@ -342,7 +395,6 @@ class ImageGeneratorGUI:
             )
             return
 
-        # Ensure the model is set in the ImageGenerator
         self.image_generator.set_model(self.replicate_model_input.value)
 
         self.save_settings()
@@ -392,9 +444,7 @@ class ImageGeneratorGUI:
                 response = await client.get(url)
                 if response.status_code == 200:
                     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                    url_part = urllib.parse.urlparse(url).path.split("/")[-2][
-                        :8
-                    ]  # Get first 8 chars of the unique part
+                    url_part = urllib.parse.urlparse(url).path.split("/")[-2][:8]
                     file_name = f"generated_image_{timestamp}_{url_part}_{i+1}.png"
                     file_path = Path(self.folder_path) / file_name
                     with open(file_path, "wb") as f:

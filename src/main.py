@@ -1,12 +1,12 @@
 import sys
 
-from gui import create_gui
 from loguru import logger
 from nicegui import ui
+
+from gui import create_gui
 from replicate_api import ImageGenerator
 
-# Configure Loguru
-logger.remove()  # Remove the default handler
+logger.remove()
 logger.add(
     sys.stderr, format="{time} {level} {message}", filter="my_module", level="INFO"
 )
@@ -14,11 +14,11 @@ logger.add(
     "main.log", rotation="10 MB", format="{time} {level} {message}", level="INFO"
 )
 
-# Create the ImageGenerator instance
+
 logger.info("Initializing ImageGenerator")
 generator = ImageGenerator()
 
-# Create and setup the GUI
+
 logger.info("Creating and setting up GUI")
 
 
@@ -28,7 +28,6 @@ async def main_page():
     logger.info("NiceGUI server is running")
 
 
-# Run the NiceGUI server
 logger.info("Starting NiceGUI server")
-# ui.run(port=8080)
+
 ui.run(title="Replicate Flux LoRA", port=8080)
