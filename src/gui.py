@@ -79,18 +79,10 @@ class ImageGeneratorGUI:
         self.setup_ui()
         logger.info("ImageGeneratorGUI initialized")
 
-    def __setattr__(self, name, value):
-        if name in getattr(self, "_attributes", []):
-            self.__dict__[name] = value
-        else:
-            super().__setattr__(name, value)
-
     def __getattr__(self, name):
         if name in self._attributes:
             return self.__dict__.get(name, None)
-        raise AttributeError(
-            f"'{self.__class__.__name__}' object has no attribute '{name}'"
-        )
+        return super().__getattribute__(name)
 
     def setup_ui(self):
         ui.dark_mode().enable()
@@ -107,9 +99,11 @@ class ImageGeneratorGUI:
         logger.info("UI setup completed")
 
     def setup_left_panel(self):
-        self.replicate_model_input = ui.input(
-            "Replicate Model", value=self.settings.get("replicate_model", "")
-        ).classes("w-full")
+        self.replicate_model_input = (
+            ui.input("Replicate Model", value=self.settings.get("replicate_model", ""))
+            .classes("w-full")
+            .tooltip("Enter the Replicate model URL or identifier")
+        )
         self.replicate_model_input.on("change", self.update_replicate_model)
 
         self.flux_models_select = ui.select(
@@ -117,8 +111,7 @@ class ImageGeneratorGUI:
             label="Flux Fine-Tune Models",
             value=None,
             on_change=self.select_flux_model,
-        ).classes("w-full")
-
+        ).classes("w-full").tooltip("Select Model")
         with ui.row().classes("w-full"):
             self.new_model_input = ui.input(label="New Model").classes("w-3/4")
             ui.button("Add Model", on_click=self.add_user_model).classes("w-1/4")
@@ -152,9 +145,9 @@ class ImageGeneratorGUI:
                 label="Flux Model",
                 value=self.settings.get("flux_model", "dev"),
             )
-            .classes("w-full")
-            .bind_value(self, "flux_model")
-        )
+            .classes("w-full").tooltip("Which model to run inferences with. the dev model needs around 28 steps but the schnell model only needs around 4 steps.")
+            .bind_value(self, "flux_model")   
+            )
 
         self.aspect_ratio_select = (
             ui.select(
@@ -176,8 +169,8 @@ class ImageGeneratorGUI:
                 value=self.settings.get("aspect_ratio", "1:1"),
             )
             .classes("w-full")
-            .bind_value(self, "aspect_ratio")
-        )
+            .bind_value(self, "aspect_ratio").tooltip("Width of the generated image. Optional, only used when aspect_ratio=custom. Must be a multiple of 16 (if it's not, it will be rounded to nearest multiple of 16)")
+            )
         self.aspect_ratio_select.on("change", self.toggle_custom_dimensions)
 
         with ui.column().classes("w-full").bind_visibility_from(
@@ -188,14 +181,14 @@ class ImageGeneratorGUI:
                     "Width", value=self.settings.get("width", 1024), min=256, max=1440
                 )
                 .classes("w-full")
-                .bind_value(self, "width")
+                .bind_value(self, "width").tooltip("Width of the generated image. Optional, only used when aspect_ratio=custom. Must be a multiple of 16 (if it's not, it will be rounded to nearest multiple of 16)")
             )
             self.height_input = (
                 ui.number(
                     "Height", value=self.settings.get("height", 1024), min=256, max=1440
                 )
                 .classes("w-full")
-                .bind_value(self, "height")
+                .bind_value(self, "height").tooltip("Height of the generated image. Optional, only used when aspect_ratio=custom. Must be a multiple of 16 (if it's not, it will be rounded to nearest multiple of 16)")
             )
 
         self.num_outputs_input = (
@@ -203,7 +196,7 @@ class ImageGeneratorGUI:
                 "Num Outputs", value=self.settings.get("num_outputs", 1), min=1, max=4
             )
             .classes("w-full")
-            .bind_value(self, "num_outputs")
+            .bind_value(self, "num_outputs").tooltip("Number of images to output.")
         )
         self.lora_scale_input = (
             ui.number(
@@ -213,7 +206,7 @@ class ImageGeneratorGUI:
                 max=2,
                 step=0.1,
             )
-            .classes("w-full")
+            .classes("w-full").tooltip("Determines how strongly the LoRA should be applied. Sane results between 0 and 1.")
             .bind_value(self, "lora_scale")
         )
         self.num_inference_steps_input = (
@@ -223,7 +216,7 @@ class ImageGeneratorGUI:
                 min=1,
                 max=50,
             )
-            .classes("w-full")
+            .classes("w-full").tooltip("Number of Inference Steps")
             .bind_value(self, "num_inference_steps")
         )
         self.guidance_scale_input = (
@@ -234,7 +227,7 @@ class ImageGeneratorGUI:
                 max=10,
                 step=0.1,
             )
-            .classes("w-full")
+            .classes("w-full").tooltip("Guidance Scale for the diffusion process")
             .bind_value(self, "guidance_scale")
         )
         self.seed_input = (
@@ -253,7 +246,7 @@ class ImageGeneratorGUI:
                 label="Output Format",
                 value=self.settings.get("output_format", "webp"),
             )
-            .classes("w-full")
+            .classes("w-full").tooltip("Format of the output images")
             .bind_value(self, "output_format")
         )
         self.output_quality_input = (
@@ -263,15 +256,15 @@ class ImageGeneratorGUI:
                 min=0,
                 max=100,
             )
-            .classes("w-full")
+            .classes("w-full").tooltip("Quality when saving the output images, from 0 to 100. 100 is best quality, 0 is lowest quality. Not relevant for .png outputs")
             .bind_value(self, "output_quality")
         )
         self.disable_safety_checker_switch = (
             ui.switch(
                 "Disable Safety Checker",
-                value=self.settings.get("disable_safety_checker", False),
+                value=self.settings.get("disable_safety_checker", True),
             )
-            .classes("w-full")
+            .classes("w-full").tooltip("Disable safety checker for generated images.")
             .bind_value(self, "disable_safety_checker")
         )
 
