@@ -10,8 +10,7 @@ import httpx
 from loguru import logger
 from nicegui import events, ui
 
-# Configure Loguru
-logger.remove()  # Remove the default handler
+logger.remove()
 logger.add(
     sys.stderr, format="{time} {level} {message}", filter="my_module", level="INFO"
 )
@@ -57,8 +56,41 @@ class ImageGeneratorGUI:
         self.load_settings()
         self.flux_fine_tune_models = self.image_generator.get_flux_fine_tune_models()
         self.user_added_models = self.settings.get("user_added_models", [])
+
+        self._attributes = [
+            "prompt",
+            "flux_model",
+            "aspect_ratio",
+            "num_outputs",
+            "lora_scale",
+            "num_inference_steps",
+            "guidance_scale",
+            "output_format",
+            "output_quality",
+            "disable_safety_checker",
+            "width",
+            "height",
+            "seed",
+        ]
+
+        for attr in self._attributes:
+            setattr(self, attr, self.settings.get(attr, None))
+
         self.setup_ui()
         logger.info("ImageGeneratorGUI initialized")
+
+    def __setattr__(self, name, value):
+        if name in getattr(self, "_attributes", []):
+            self.__dict__[name] = value
+        else:
+            super().__setattr__(name, value)
+
+    def __getattr__(self, name):
+        if name in self._attributes:
+            return self.__dict__.get(name, None)
+        raise AttributeError(
+            f"'{self.__class__.__name__}' object has no attribute '{name}'"
+        )
 
     def setup_ui(self):
         ui.dark_mode().enable()
@@ -288,7 +320,6 @@ class ImageGeneratorGUI:
         self.spinner = ui.spinner(type="infinity", size="xl")
         self.spinner.visible = False
 
-        # Add gallery view
         self.gallery_container = ui.column().classes("w-full mt-4")
         self.lightbox = Lightbox()
 
@@ -342,7 +373,6 @@ class ImageGeneratorGUI:
             )
             return
 
-        # Ensure the model is set in the ImageGenerator
         self.image_generator.set_model(self.replicate_model_input.value)
 
         self.save_settings()
@@ -392,9 +422,7 @@ class ImageGeneratorGUI:
                 response = await client.get(url)
                 if response.status_code == 200:
                     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                    url_part = urllib.parse.urlparse(url).path.split("/")[-2][
-                        :8
-                    ]  # Get first 8 chars of the unique part
+                    url_part = urllib.parse.urlparse(url).path.split("/")[-2][:8]
                     file_name = f"generated_image_{timestamp}_{url_part}_{i+1}.png"
                     file_path = Path(self.folder_path) / file_name
                     with open(file_path, "wb") as f:
