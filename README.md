@@ -21,7 +21,7 @@ Docker is the recommended way to run this application. It ensures consistent env
 
 ### Docker Compose Setup
 1. Create a `docker-compose.yml` file with the following content:
-   ```yaml
+```yaml
   services:
     replicate-flux-lora:
       image: ghcr.io/rtuszik/replicate-flux-lora:latest
@@ -32,7 +32,7 @@ Docker is the recommended way to run this application. It ensures consistent env
       volumes:
         - ${HOST_OUTPUT_DIR}:/app/output
       restart: unless-stopped
-   ```
+```
 
 2. Create a `.env` file in the same directory with the following content:
    ```
@@ -73,13 +73,13 @@ If you prefer to run the application without Docker, you can use a local Python 
 
 4. Set up your environment variables:
    - Copy the example.env file to create your own .env file:
-     ```
+   ```
      cp example.env .env
-     ```
+   ```
    - Edit the .env file and replace 'your_api_key_here' with your actual Replicate API key:
-     ```
+   ```
      REPLICATE_API_TOKEN=your_api_key_here
-     ```
+   ```
 
 5. Run the application:
    ```
