@@ -39,11 +39,7 @@ jobs:
           type=raw,value=latest
           type=sha,prefix={{branch}}-
           type=ref,event=branch
-          type=semver,pattern={{version}}
-        labels: |
-          org.opencontainers.image.source=${{ github.repositoryUrl }}
-          org.opencontainers.image.revision=${{ github.sha }}
-          org.opencontainers.image.created=${{ steps.meta.outputs.created }}
+
 
     - name: Build and push Docker image
       uses: docker/build-push-action@v4
