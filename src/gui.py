@@ -87,16 +87,19 @@ class ImageGeneratorGUI:
     def setup_ui(self):
         ui.dark_mode().enable()
 
-        with ui.column().classes("w-full max-w-full mx-auto space-y-8"):
-            with ui.card().classes("w-full"):
+        with ui.grid(columns=2).classes("w-screen h-full gap-4 px-8"):
+            with ui.card().classes("col-span-2"):
                 ui.label("Flux LoRA API").classes("text-2xl font-bold mb-4")
-                with ui.row():
-                    with ui.column(wrap=False):
-                        self.setup_left_panel()
-                    with ui.column(wrap=False):
-                        self.setup_right_panel()
-                ui.separator()
+
+            with ui.card().classes("h-[70vh] overflow-auto"):
+                self.setup_left_panel()
+
+            with ui.card().classes("h-[70vh] overflow-auto"):
+                self.setup_right_panel()
+
+            with ui.card().classes("col-span-2"):
                 self.setup_bottom_panel()
+
         logger.info("UI setup completed")
 
     def setup_left_panel(self):
@@ -338,7 +341,7 @@ class ImageGeneratorGUI:
             self.folder_input.value = self.folder_path
 
     def setup_right_panel(self):
-        self.spinner = ui.spinner(type="infinity", size="xl")
+        self.spinner = ui.spinner(type="infinity", size="150px")
         self.spinner.visible = False
 
         self.gallery_container = ui.column().classes("w-full mt-4")
