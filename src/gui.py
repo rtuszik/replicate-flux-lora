@@ -7,6 +7,7 @@ from datetime import datetime
 from pathlib import Path
 
 import httpx
+from config import settings
 from loguru import logger
 from nicegui import events, ui
 
@@ -52,10 +53,9 @@ class Lightbox:
 class ImageGeneratorGUI:
     def __init__(self, image_generator):
         self.image_generator = image_generator
-        self.settings_file = "settings.json"
-        self.load_settings()
+        self.settings = settings
         self.flux_fine_tune_models = self.image_generator.get_flux_fine_tune_models()
-        self.user_added_models = self.settings.get("user_added_models", [])
+        self.user_added_models = self.get_setting("user_models", {})
 
         self._attributes = [
             "prompt",
@@ -78,6 +78,9 @@ class ImageGeneratorGUI:
 
         self.setup_ui()
         logger.info("ImageGeneratorGUI initialized")
+
+    def get_setting(self, key, default=None):
+        return self.settings.get(key, default)
 
     def __getattr__(self, name):
         if name in self._attributes:
@@ -103,8 +106,9 @@ class ImageGeneratorGUI:
         logger.info("UI setup completed")
 
     def setup_left_panel(self):
+        print(f"Available settings: {settings.as_dict()}")
         self.replicate_model_input = (
-            ui.input("Replicate Model", value=self.settings.get("replicate_model", ""))
+            ui.input("Replicate Model", value=settings.get("replicate_model", ""))
             .classes("w-full")
             .tooltip("Enter the Replicate model URL or identifier")
         )
@@ -118,11 +122,13 @@ class ImageGeneratorGUI:
                 on_change=self.select_flux_model,
             )
             .classes("w-full")
-            .tooltip("Select Model")
+            .tooltip("Select Public Model")
         )
         with ui.row().classes("w-full"):
-            self.new_model_input = ui.input(label="New Model").classes("w-3/4")
-            ui.button("Add Model", on_click=self.add_user_model).classes("w-1/4")
+            self.new_model_input = ui.input(label="Add Custom LoRA").classes("w-3/4")
+            ui.button("Add Custom LoRA Model", on_click=self.add_user_model).classes(
+                "w-1/4"
+            )
 
         self.user_models_select = ui.select(
             options=self.user_added_models,
@@ -143,7 +149,7 @@ class ImageGeneratorGUI:
             )
 
         self.folder_input = ui.input(
-            label="Output Folder", value=self.folder_path
+            label="Output Folder", value=settings.output_folder
         ).classes("w-full")
         self.folder_input.on("change", self.update_folder_path)
 
@@ -302,8 +308,8 @@ class ImageGeneratorGUI:
     def add_user_model(self):
         new_model = self.new_model_input.value
         if new_model and new_model not in self.user_added_models:
-            self.user_added_models.append(new_model)
-            self.user_models_select.options = self.user_added_models
+            self.user_added_models[new_model] = new_model
+            self.user_models_select.options = list(self.user_added_models.keys())
             self.new_model_input.value = ""
             self.save_settings()
             ui.notify(f"Model '{new_model}' added successfully", type="positive")
@@ -313,8 +319,8 @@ class ImageGeneratorGUI:
     def delete_user_model(self):
         selected_model = self.user_models_select.value
         if selected_model in self.user_added_models:
-            self.user_added_models.remove(selected_model)
-            self.user_models_select.options = self.user_added_models
+            del self.user_added_models[selected_model]
+            self.user_models_select.options = list(self.user_added_models.keys())
             self.user_models_select.value = None
             self.save_settings()
             ui.notify(f"Model '{selected_model}' deleted successfully", type="positive")
@@ -469,35 +475,18 @@ class ImageGeneratorGUI:
                 )
 
     def load_settings(self):
-        if os.path.exists(self.settings_file):
-            with open(self.settings_file, "r") as f:
-                self.settings = json.load(f)
-            logger.info("Settings loaded successfully")
-        else:
-            self.settings = {}
-            logger.info("No existing settings found, using defaults")
+        self.settings = settings.as_dict()
+        self.user_added_models = list(settings.get("user_models", {}).keys())
+        logger.info("No existing settings found, using defaults")
 
     def save_settings(self):
-        settings_to_save = {
-            "user_added_models": self.user_added_models,
-            "replicate_model": self.replicate_model_input.value,
-            "output_folder": self.folder_path,
-            "flux_model": self.flux_model,
-            "aspect_ratio": self.aspect_ratio,
-            "width": self.width,
-            "height": self.height,
-            "num_outputs": self.num_outputs,
-            "lora_scale": self.lora_scale,
-            "num_inference_steps": self.num_inference_steps,
-            "guidance_scale": self.guidance_scale,
-            "seed": self.seed,
-            "output_format": self.output_format,
-            "output_quality": self.output_quality,
-            "disable_safety_checker": self.disable_safety_checker,
-            "prompt": self.prompt,
-        }
-        with open(self.settings_file, "w") as f:
-            json.dump(settings_to_save, f)
+        for attr in self._attributes:
+            self.settings[attr] = getattr(self, attr)
+        self.settings["user_models"] = self.user_added_models
+        self.settings["replicate_model"] = self.replicate_model_input.value
+        self.settings["output_folder"] = self.folder_path
+        settings.update(self.settings)
+        settings.write()
         logger.info("Settings saved successfully")
 
 

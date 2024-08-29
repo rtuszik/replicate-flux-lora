@@ -1,0 +1,18 @@
+[default]
+replicate_model = ""
+output_folder = ""
+flux_model = "dev"
+aspect_ratio = "1:1"
+width = 1024
+height = 1024
+num_outputs = 1
+lora_scale = 0.8
+num_inference_steps = 28
+guidance_scale = 3.5
+seed = -1
+output_format = "png"
+output_quality = 80
+disable_safety_checker = true
+prompt = ""
+
+[user_models]
