@@ -55,7 +55,7 @@ class ImageGeneratorGUI:
     def __init__(self, image_generator):
         self.image_generator = image_generator
         self.settings = settings
-        self.flux_fine_tune_models = self.image_generator.get_flux_fine_tune_models()
+        self.flux_fine_tune_models = []
         self.user_added_models = {}
 
         self._attributes = [
@@ -87,8 +87,15 @@ class ImageGeneratorGUI:
         self.setup_ui()
         logger.info("ImageGeneratorGUI initialized")
 
-    def get_setting(self, key, default=None):
-        return getattr(self, key, default)
+        # Set up a timer to load flux models asynchronously
+        ui.timer(0.1, self.load_flux_models, once=True)
+
+    async def load_flux_models(self):
+        self.flux_fine_tune_models = await asyncio.to_thread(
+            self.image_generator.get_flux_fine_tune_models
+        )
+        self.flux_models_ui.refresh()
+        logger.info("Flux models loaded asynchronously")
 
     def setup_ui(self):
         ui.dark_mode().enable()
@@ -109,24 +116,15 @@ class ImageGeneratorGUI:
         logger.info("UI setup completed")
 
     def setup_left_panel(self):
-        print(f"Available settings: {settings.as_dict()}")
         self.replicate_model_input = (
-            ui.input("Replicate Model", value=settings.get("replicate_model", ""))
+            ui.input("Replicate Model", value=self.settings.get("replicate_model", ""))
             .classes("w-full")
             .tooltip("Enter the Replicate model URL or identifier")
         )
         self.replicate_model_input.on("change", self.update_replicate_model)
 
-        self.flux_models_select = (
-            ui.select(
-                options=self.flux_fine_tune_models,
-                label="Flux Fine-Tune Models",
-                value=None,
-                on_change=self.select_flux_model,
-            )
-            .classes("w-full")
-            .tooltip("Select Public Model")
-        )
+        self.flux_models_ui()
+
         with ui.row().classes("w-full"):
             self.new_model_input = ui.input(label="Add Custom LoRA").classes("w-3/4")
             ui.button("Add Custom LoRA Model", on_click=self.add_user_model).classes(
@@ -307,40 +305,78 @@ class ImageGeneratorGUI:
             .tooltip("Disable safety checker for generated images.")
             .bind_value(self, "disable_safety_checker")
         )
+        self.reset_button = ui.button(
+            "Reset to Default", on_click=self.reset_to_default
+        ).classes(
+            "w-1/2 bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded"
+        )
 
-    def add_user_model(self):
+    @ui.refreshable
+    def flux_models_ui(self):
+        self.flux_models_select = (
+            ui.select(
+                options=self.flux_fine_tune_models,
+                label="Flux Fine-Tune Models",
+                value=None,
+                on_change=self.select_flux_model,
+            )
+            .classes("w-full")
+            .tooltip("Select Public Model")
+        )
+        if not self.flux_fine_tune_models:
+            ui.label("Loading Flux models...").classes("text-gray-500")
+
+    async def update_replicate_model(self, e):
+        new_model = self.replicate_model_input.value
+        if new_model:
+            await asyncio.to_thread(self.image_generator.set_model, new_model)
+            self.replicate_model = new_model
+            await asyncio.to_thread(self.save_settings)
+            logger.info(f"Replicate model updated to: {new_model}")
+            self.generate_button.enable()
+        else:
+            logger.warning("Empty Replicate model provided")
+            self.generate_button.disable()
+
+    async def select_flux_model(self, e):
+        if e.value:
+            self.replicate_model_input.value = e.value
+            await self.update_replicate_model(e)
+            self.flux_models_select.value = None
+
+    async def add_user_model(self):
         new_model = self.new_model_input.value
         if new_model and new_model not in self.user_added_models:
             self.user_added_models[new_model] = new_model
             self.user_models_select.options = list(self.user_added_models.keys())
             self.new_model_input.value = ""
-            self.save_settings()
+            await asyncio.to_thread(self.save_settings)
             ui.notify(f"Model '{new_model}' added successfully", type="positive")
         else:
             ui.notify("Invalid model name or model already exists", type="negative")
 
-    def delete_user_model(self):
+    async def delete_user_model(self):
         selected_model = self.user_models_select.value
         if selected_model in self.user_added_models:
             del self.user_added_models[selected_model]
             self.user_models_select.options = list(self.user_added_models.keys())
             self.user_models_select.value = None
-            self.save_settings()
+            await asyncio.to_thread(self.save_settings)
             ui.notify(f"Model '{selected_model}' deleted successfully", type="positive")
         else:
             ui.notify("No model selected for deletion", type="negative")
 
-    def select_user_model(self, e):
+    async def select_user_model(self, e):
         if e.value:
             self.replicate_model_input.value = e.value
-            self.update_replicate_model(e)
+            await self.update_replicate_model(e)
             self.user_models_select.value = None
 
-    def update_folder_path(self, e):
+    async def update_folder_path(self, e):
         new_path = e.value
         if os.path.isdir(new_path):
             self.output_folder = new_path
-            self.save_settings()
+            await asyncio.to_thread(self.save_settings)
             logger.info(f"Output folder set to: {self.output_folder}")
             ui.notify(
                 f"Output folder updated to: {self.output_folder}", type="positive"
@@ -370,41 +406,18 @@ class ImageGeneratorGUI:
         ).classes(
             "w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded"
         )
-        self.reset_button = ui.button(
-            "Reset to Default", on_click=self.reset_to_default
-        ).classes(
-            "w-1/2 bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded"
-        )
 
-    def update_replicate_model(self, e):
-        new_model = self.replicate_model_input.value
-        if new_model:
-            self.image_generator.set_model(new_model)
-            self.replicate_model = new_model
-            self.save_settings()
-            logger.info(f"Replicate model updated to: {new_model}")
-            self.generate_button.enable()
-        else:
-            logger.warning("Empty Replicate model provided")
-            self.generate_button.disable()
-
-    def select_flux_model(self, e):
-        if e.value:
-            self.replicate_model_input.value = e.value
-            self.update_replicate_model(e)
-            self.flux_models_select.value = None
-
-    def toggle_custom_dimensions(self, e):
+    async def toggle_custom_dimensions(self, e):
         if e.value == "custom":
             self.width_input.enable()
             self.height_input.enable()
         else:
             self.width_input.disable()
             self.height_input.disable()
-        self.save_settings()
+        await asyncio.to_thread(self.save_settings)
         logger.info(f"Custom dimensions toggled: {e.value}")
 
-    def reset_to_default(self):
+    async def reset_to_default(self):
         with open("settings.toml", "r") as f:
             default_settings = toml.load(f)["default"]
 
@@ -420,7 +433,7 @@ class ImageGeneratorGUI:
                     getattr(self, f"{attr}_switch").value = value
 
         self.user_added_models = {}
-        self.save_settings()
+        await asyncio.to_thread(self.save_settings)
         ui.notify("Settings reset to default values", type="info")
         logger.info("Settings reset to default values")
 
@@ -435,9 +448,11 @@ class ImageGeneratorGUI:
             )
             return
 
-        self.image_generator.set_model(self.replicate_model_input.value)
+        await asyncio.to_thread(
+            self.image_generator.set_model, self.replicate_model_input.value
+        )
 
-        self.save_settings()
+        await asyncio.to_thread(self.save_settings)
         params = {
             "prompt": self.prompt,
             "flux_model": self.flux_model,
