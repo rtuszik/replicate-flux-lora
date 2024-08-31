@@ -7,6 +7,7 @@ from datetime import datetime
 from pathlib import Path
 
 import httpx
+import toml
 from config import settings
 from loguru import logger
 from nicegui import events, ui
@@ -55,7 +56,7 @@ class ImageGeneratorGUI:
         self.image_generator = image_generator
         self.settings = settings
         self.flux_fine_tune_models = self.image_generator.get_flux_fine_tune_models()
-        self.user_added_models = self.get_setting("user_models", {})
+        self.user_added_models = {}
 
         self._attributes = [
             "prompt",
@@ -71,21 +72,23 @@ class ImageGeneratorGUI:
             "width",
             "height",
             "seed",
+            "output_folder",
+            "replicate_model",
         ]
 
-        for attr in self._attributes:
-            setattr(self, attr, self.settings.get(attr, None))
+        self.load_settings()
+
+        # Set default output folder if not present in settings
+        if not self.output_folder:
+            self.output_folder = (
+                str(Path.home() / "Downloads") if not DOCKERIZED else "/app/output"
+            )
 
         self.setup_ui()
         logger.info("ImageGeneratorGUI initialized")
 
     def get_setting(self, key, default=None):
-        return self.settings.get(key, default)
-
-    def __getattr__(self, name):
-        if name in self._attributes:
-            return self.__dict__.get(name, None)
-        return super().__getattribute__(name)
+        return getattr(self, key, default)
 
     def setup_ui(self):
         ui.dark_mode().enable()
@@ -131,7 +134,7 @@ class ImageGeneratorGUI:
             )
 
         self.user_models_select = ui.select(
-            options=self.user_added_models,
+            options=list(self.user_added_models.keys()),
             label="User Added Models",
             value=None,
             on_change=self.select_user_model,
@@ -149,7 +152,7 @@ class ImageGeneratorGUI:
             )
 
         self.folder_input = ui.input(
-            label="Output Folder", value=settings.output_folder
+            label="Output Folder", value=self.output_folder
         ).classes("w-full")
         self.folder_input.on("change", self.update_folder_path)
 
@@ -336,15 +339,17 @@ class ImageGeneratorGUI:
     def update_folder_path(self, e):
         new_path = e.value
         if os.path.isdir(new_path):
-            self.folder_path = new_path
+            self.output_folder = new_path
             self.save_settings()
-            logger.info(f"Output folder set to: {self.folder_path}")
-            ui.notify(f"Output folder updated to: {self.folder_path}", type="positive")
+            logger.info(f"Output folder set to: {self.output_folder}")
+            ui.notify(
+                f"Output folder updated to: {self.output_folder}", type="positive"
+            )
         else:
             ui.notify(
                 "Invalid folder path. Please enter a valid directory.", type="negative"
             )
-            self.folder_input.value = self.folder_path
+            self.folder_input.value = self.output_folder
 
     def setup_right_panel(self):
         self.spinner = ui.spinner(type="infinity", size="150px")
@@ -365,11 +370,17 @@ class ImageGeneratorGUI:
         ).classes(
             "w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded"
         )
+        self.reset_button = ui.button(
+            "Reset to Default", on_click=self.reset_to_default
+        ).classes(
+            "w-1/2 bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded"
+        )
 
     def update_replicate_model(self, e):
         new_model = self.replicate_model_input.value
         if new_model:
             self.image_generator.set_model(new_model)
+            self.replicate_model = new_model
             self.save_settings()
             logger.info(f"Replicate model updated to: {new_model}")
             self.generate_button.enable()
@@ -392,6 +403,26 @@ class ImageGeneratorGUI:
             self.height_input.disable()
         self.save_settings()
         logger.info(f"Custom dimensions toggled: {e.value}")
+
+    def reset_to_default(self):
+        with open("settings.toml", "r") as f:
+            default_settings = toml.load(f)["default"]
+
+        for attr in self._attributes:
+            if attr in default_settings:
+                value = default_settings[attr]
+                setattr(self, attr, value)
+                if hasattr(self, f"{attr}_input"):
+                    getattr(self, f"{attr}_input").value = value
+                elif hasattr(self, f"{attr}_select"):
+                    getattr(self, f"{attr}_select").value = value
+                elif hasattr(self, f"{attr}_switch"):
+                    getattr(self, f"{attr}_switch").value = value
+
+        self.user_added_models = {}
+        self.save_settings()
+        ui.notify("Settings reset to default values", type="info")
+        logger.info("Settings reset to default values")
 
     async def start_generation(self):
         if not self.replicate_model_input.value:
@@ -455,7 +486,7 @@ class ImageGeneratorGUI:
                     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                     url_part = urllib.parse.urlparse(url).path.split("/")[-2][:8]
                     file_name = f"generated_image_{timestamp}_{url_part}_{i+1}.png"
-                    file_path = Path(self.folder_path) / file_name
+                    file_path = Path(self.output_folder) / file_name
                     with open(file_path, "wb") as f:
                         f.write(response.content)
                     downloaded_images.append(str(file_path))
@@ -475,18 +506,33 @@ class ImageGeneratorGUI:
                 )
 
     def load_settings(self):
-        self.settings = settings.as_dict()
-        self.user_added_models = list(settings.get("user_models", {}).keys())
-        logger.info("No existing settings found, using defaults")
+        # Load default settings
+        with open("settings.toml", "r") as f:
+            default_settings = toml.load(f)["default"]
+
+        # Load local settings
+        local_settings = {}
+        if os.path.exists("settings.local.toml"):
+            with open("settings.local.toml", "r") as f:
+                local_settings = toml.load(f).get("default", {})
+
+        # Merge settings, prioritizing local settings
+        for attr in self._attributes:
+            setattr(self, attr, local_settings.get(attr, default_settings.get(attr)))
+
+        self.user_added_models = local_settings.get("user_models", {})
 
     def save_settings(self):
+        settings_dict = {}
         for attr in self._attributes:
-            self.settings[attr] = getattr(self, attr)
-        self.settings["user_models"] = self.user_added_models
-        self.settings["replicate_model"] = self.replicate_model_input.value
-        self.settings["output_folder"] = self.folder_path
-        settings.update(self.settings)
-        settings.write()
+            settings_dict[attr] = getattr(self, attr)
+        settings_dict["user_models"] = self.user_added_models
+        settings_dict["replicate_model"] = self.replicate_model_input.value
+
+        # Save settings to settings.local.toml
+        with open("settings.local.toml", "w") as f:
+            toml.dump({"default": settings_dict}, f)
+
         logger.info("Settings saved successfully")
 
 
