@@ -12,6 +12,10 @@ A simple web interface for running Flux models using the Replicate API. Use it t
 - Saves your settings
 - Shows generated images in a gallery
 
+## Screenshot
+![Screenshot](assets/screenshot_1.png)
+
+
 ## Recommended Setup: Docker
 Docker is the recommended way to run this application. It ensures consistent environment across different systems.
 
