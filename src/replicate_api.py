@@ -38,10 +38,8 @@ class ImageGenerator:
             raise ImageGenerationError(error_message)
 
         try:
-            # Remove the Flux model from params and store it separately
             flux_model = params.pop("flux_model", "dev")
 
-            # Add the Flux model choice to the input parameters
             params["model"] = flux_model
 
             logger.info(
@@ -57,15 +55,6 @@ class ImageGenerator:
             error_message = f"Error generating images: {str(e)}"
             logger.exception(error_message)
             raise ImageGenerationError(error_message)
-
-    def get_flux_fine_tune_models(self):
-        try:
-            collection = replicate.collections.get("flux-fine-tunes")
-            models = collection.models
-            return [model.name for model in models]
-        except Exception as e:
-            logger.error(f"Error fetching flux-fine-tunes models: {str(e)}")
-            return []
 
 
 class ImageGenerationError(Exception):

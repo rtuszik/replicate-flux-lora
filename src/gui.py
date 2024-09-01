@@ -55,7 +55,6 @@ class ImageGeneratorGUI:
     def __init__(self, image_generator):
         self.image_generator = image_generator
         self.settings = settings
-        self.flux_fine_tune_models = []
         self.user_added_models = {}
 
         self._attributes = [
@@ -78,7 +77,6 @@ class ImageGeneratorGUI:
 
         self.load_settings()
 
-        # Set default output folder if not present in settings
         if not self.output_folder:
             self.output_folder = (
                 str(Path.home() / "Downloads") if not DOCKERIZED else "/app/output"
@@ -86,16 +84,6 @@ class ImageGeneratorGUI:
 
         self.setup_ui()
         logger.info("ImageGeneratorGUI initialized")
-
-        # Set up a timer to load flux models asynchronously
-        ui.timer(0.1, self.load_flux_models, once=True)
-
-    async def load_flux_models(self):
-        self.flux_fine_tune_models = await asyncio.to_thread(
-            self.image_generator.get_flux_fine_tune_models
-        )
-        self.flux_models_ui.refresh()
-        logger.info("Flux models loaded asynchronously")
 
     def setup_ui(self):
         ui.dark_mode().enable()
@@ -123,30 +111,19 @@ class ImageGeneratorGUI:
         )
         self.replicate_model_input.on("change", self.update_replicate_model)
 
-        self.flux_models_ui()
-
-        with ui.row().classes("w-full"):
-            self.new_model_input = ui.input(label="Add Custom LoRA").classes("w-3/4")
-            ui.button("Add Custom LoRA Model", on_click=self.add_user_model).classes(
-                "w-1/4"
+        with ui.row().classes("w-full mt-4"):
+            self.user_model_select = (
+                ui.select(
+                    options=list(self.user_added_models.keys()),
+                    label="User Added Models",
+                    value=None,
+                    on_change=self.select_user_model,
+                )
+                .classes("w-5/6")
+                .tooltip("Select or manage user-added models")
             )
-
-        self.user_models_select = ui.select(
-            options=list(self.user_added_models.keys()),
-            label="User Added Models",
-            value=None,
-            on_change=self.select_user_model,
-        ).classes("w-full")
-
-        ui.button("Delete Selected Model", on_click=self.delete_user_model).classes(
-            "w-full"
-        )
-
-        if DOCKERIZED:
-            self.folder_path = self.settings.get("output_folder", str("/app/output"))
-        else:
-            self.folder_path = self.settings.get(
-                "output_folder", str(Path.home() / "Downloads")
+            ui.button(icon="add").classes("w-1/6").on(
+                "click", self.open_user_model_popup
             )
 
         self.folder_input = ui.input(
@@ -162,7 +139,7 @@ class ImageGeneratorGUI:
             )
             .classes("w-full")
             .tooltip(
-                "Which model to run inferences with. the dev model needs around 28 steps but the schnell model only needs around 4 steps."
+                "Which model to run inferences with. The dev model needs around 28 steps but the schnell model only needs around 4 steps."
             )
             .bind_value(self, "flux_model")
         )
@@ -311,82 +288,6 @@ class ImageGeneratorGUI:
             "w-1/2 bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded"
         )
 
-    @ui.refreshable
-    def flux_models_ui(self):
-        self.flux_models_select = (
-            ui.select(
-                options=self.flux_fine_tune_models,
-                label="Flux Fine-Tune Models",
-                value=None,
-                on_change=self.select_flux_model,
-            )
-            .classes("w-full")
-            .tooltip("Select Public Model")
-        )
-        if not self.flux_fine_tune_models:
-            ui.label("Loading Flux models...").classes("text-gray-500")
-
-    async def update_replicate_model(self, e):
-        new_model = self.replicate_model_input.value
-        if new_model:
-            await asyncio.to_thread(self.image_generator.set_model, new_model)
-            self.replicate_model = new_model
-            await asyncio.to_thread(self.save_settings)
-            logger.info(f"Replicate model updated to: {new_model}")
-            self.generate_button.enable()
-        else:
-            logger.warning("Empty Replicate model provided")
-            self.generate_button.disable()
-
-    async def select_flux_model(self, e):
-        if e.value:
-            self.replicate_model_input.value = e.value
-            await self.update_replicate_model(e)
-            self.flux_models_select.value = None
-
-    async def add_user_model(self):
-        new_model = self.new_model_input.value
-        if new_model and new_model not in self.user_added_models:
-            self.user_added_models[new_model] = new_model
-            self.user_models_select.options = list(self.user_added_models.keys())
-            self.new_model_input.value = ""
-            await asyncio.to_thread(self.save_settings)
-            ui.notify(f"Model '{new_model}' added successfully", type="positive")
-        else:
-            ui.notify("Invalid model name or model already exists", type="negative")
-
-    async def delete_user_model(self):
-        selected_model = self.user_models_select.value
-        if selected_model in self.user_added_models:
-            del self.user_added_models[selected_model]
-            self.user_models_select.options = list(self.user_added_models.keys())
-            self.user_models_select.value = None
-            await asyncio.to_thread(self.save_settings)
-            ui.notify(f"Model '{selected_model}' deleted successfully", type="positive")
-        else:
-            ui.notify("No model selected for deletion", type="negative")
-
-    async def select_user_model(self, e):
-        if e.value:
-            self.replicate_model_input.value = e.value
-            await self.update_replicate_model(e)
-            self.user_models_select.value = None
-
-    async def update_folder_path(self, e):
-        new_path = e.value
-        if os.path.isdir(new_path):
-            self.output_folder = new_path
-            await asyncio.to_thread(self.save_settings)
-            logger.info(f"Output folder set to: {self.output_folder}")
-            ui.notify(
-                f"Output folder updated to: {self.output_folder}", type="positive"
-            )
-        else:
-            ui.notify(
-                "Invalid folder path. Please enter a valid directory.", type="negative"
-            )
-            self.folder_input.value = self.output_folder
-
     def setup_right_panel(self):
         self.spinner = ui.spinner(type="infinity", size="150px")
         self.spinner.visible = False
@@ -406,6 +307,83 @@ class ImageGeneratorGUI:
         ).classes(
             "w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded"
         )
+
+    def open_user_model_popup(self):
+        with ui.dialog() as dialog, ui.card():
+            ui.label("Manage User-Added Models").classes("text-xl font-bold mb-4")
+            new_model_input = ui.input(label="Add New Model").classes("w-full mb-4")
+            add_button = ui.button(
+                "Add Model",
+                on_click=lambda: self.add_user_model(new_model_input.value, dialog),
+            )
+
+            ui.label("Current User-Added Models:").classes("mt-4 mb-2")
+            with ui.column().classes("w-full"):
+                for model in self.user_added_models:
+                    with ui.row().classes("w-full justify-between items-center"):
+                        ui.label(model)
+                        ui.button(
+                            icon="delete",
+                            on_click=lambda m=model: self.delete_user_model(m, dialog),
+                        ).props("flat round color=red")
+
+            ui.button("Close", on_click=dialog.close).classes("mt-4")
+        dialog.open()
+
+    async def add_user_model(self, new_model, dialog):
+        if new_model and new_model not in self.user_added_models:
+            self.user_added_models[new_model] = new_model
+            self.user_model_select.options = list(self.user_added_models.keys())
+            await asyncio.to_thread(self.save_settings)
+            ui.notify(f"Model '{new_model}' added successfully", type="positive")
+            dialog.close()
+        else:
+            ui.notify("Invalid model name or model already exists", type="negative")
+
+    async def delete_user_model(self, model, dialog):
+        if model in self.user_added_models:
+            del self.user_added_models[model]
+            self.user_model_select.options = list(self.user_added_models.keys())
+            if self.user_model_select.value == model:
+                self.user_model_select.value = None
+            await asyncio.to_thread(self.save_settings)
+            ui.notify(f"Model '{model}' deleted successfully", type="positive")
+            dialog.close()
+        else:
+            ui.notify("Cannot delete this model", type="negative")
+
+    async def select_user_model(self, e):
+        if e.value:
+            self.replicate_model_input.value = e.value
+            await self.update_replicate_model(e)
+            self.user_model_select.value = None
+
+    async def update_replicate_model(self, e):
+        new_model = self.replicate_model_input.value
+        if new_model:
+            await asyncio.to_thread(self.image_generator.set_model, new_model)
+            self.replicate_model = new_model
+            await asyncio.to_thread(self.save_settings)
+            logger.info(f"Replicate model updated to: {new_model}")
+            self.generate_button.enable()
+        else:
+            logger.warning("Empty Replicate model provided")
+            self.generate_button.disable()
+
+    async def update_folder_path(self, e):
+        new_path = e.value
+        if os.path.isdir(new_path):
+            self.output_folder = new_path
+            await asyncio.to_thread(self.save_settings)
+            logger.info(f"Output folder set to: {self.output_folder}")
+            ui.notify(
+                f"Output folder updated to: {self.output_folder}", type="positive"
+            )
+        else:
+            ui.notify(
+                "Invalid folder path. Please enter a valid directory.", type="negative"
+            )
+            self.folder_input.value = self.output_folder
 
     async def toggle_custom_dimensions(self, e):
         if e.value == "custom":
@@ -521,17 +499,14 @@ class ImageGeneratorGUI:
                 )
 
     def load_settings(self):
-        # Load default settings
         with open("settings.toml", "r") as f:
             default_settings = toml.load(f)["default"]
 
-        # Load local settings
         local_settings = {}
         if os.path.exists("settings.local.toml"):
             with open("settings.local.toml", "r") as f:
                 local_settings = toml.load(f).get("default", {})
 
-        # Merge settings, prioritizing local settings
         for attr in self._attributes:
             setattr(self, attr, local_settings.get(attr, default_settings.get(attr)))
 
@@ -544,7 +519,6 @@ class ImageGeneratorGUI:
         settings_dict["user_models"] = self.user_added_models
         settings_dict["replicate_model"] = self.replicate_model_input.value
 
-        # Save settings to settings.local.toml
         with open("settings.local.toml", "w") as f:
             toml.dump({"default": settings_dict}, f)
 
