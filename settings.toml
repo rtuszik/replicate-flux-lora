@@ -13,6 +13,7 @@ height = 1024
 seed = -1
 output_folder = ""
 replicate_model = ""
-prompt = ""
+prompt = "Enter Prompt here..."
 
-[user_models]
+[models]
+user_added = []
