@@ -1,6 +1,8 @@
-replicate==0.32.0
+replicate==0.32.1
 python-dotenv==1.0.1
 token_count==0.2.1
 loguru==0.7.2
-nicegui==1.4.36
-httpx==0.27.0
+nicegui==1.4.37
+httpx==0.27.2
+dynaconf==3.2.6
+toml==0.10.2

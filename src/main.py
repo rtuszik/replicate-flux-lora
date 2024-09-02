@@ -1,9 +1,8 @@
 import sys
 
+from gui import create_gui
 from loguru import logger
 from nicegui import ui
-
-from gui import create_gui
 from replicate_api import ImageGenerator
 
 logger.remove()
