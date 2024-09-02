@@ -75,6 +75,10 @@ class ImageGeneratorGUI:
             "replicate_model",
         ]
 
+        # Initialize attributes
+        for attr in self._attributes:
+            setattr(self, attr, None)
+
         self.load_settings()
 
         if not self.output_folder:
@@ -104,23 +108,16 @@ class ImageGeneratorGUI:
         logger.info("UI setup completed")
 
     def setup_left_panel(self):
-        self.replicate_model_input = (
-            ui.input("Replicate Model", value=self.settings.get("replicate_model", ""))
-            .classes("w-full")
-            .tooltip("Enter the Replicate model URL or identifier")
-        )
-        self.replicate_model_input.on("change", self.update_replicate_model)
-
-        with ui.row().classes("w-full mt-4"):
-            self.user_model_select = (
+        with ui.row().classes("w-full"):
+            self.replicate_model_select = (
                 ui.select(
-                    options=list(self.user_added_models.keys()),
-                    label="User Added Models",
-                    value=None,
-                    on_change=self.select_user_model,
+                    options=self.model_options,
+                    label="Replicate Model",
+                    value=self.replicate_model,
+                    on_change=self.update_replicate_model,
                 )
                 .classes("w-5/6")
-                .tooltip("Select or manage user-added models")
+                .tooltip("Select or manage Replicate models")
             )
             ui.button(icon="add").classes("w-1/6").on(
                 "click", self.open_user_model_popup
@@ -310,14 +307,14 @@ class ImageGeneratorGUI:
 
     def open_user_model_popup(self):
         with ui.dialog() as dialog, ui.card():
-            ui.label("Manage User-Added Models").classes("text-xl font-bold mb-4")
+            ui.label("Manage Replicate Models").classes("text-xl font-bold mb-4")
             new_model_input = ui.input(label="Add New Model").classes("w-full mb-4")
             add_button = ui.button(
                 "Add Model",
                 on_click=lambda: self.add_user_model(new_model_input.value, dialog),
             )
 
-            ui.label("Current User-Added Models:").classes("mt-4 mb-2")
+            ui.label("Current Models:").classes("mt-4 mb-2")
             with ui.column().classes("w-full"):
                 for model in self.user_added_models:
                     with ui.row().classes("w-full justify-between items-center"):
@@ -333,7 +330,16 @@ class ImageGeneratorGUI:
     async def add_user_model(self, new_model, dialog):
         if new_model and new_model not in self.user_added_models:
             self.user_added_models[new_model] = new_model
-            self.user_model_select.options = list(self.user_added_models.keys())
+            self.model_options = list(self.user_added_models.keys())
+            self.replicate_model_select.options = self.model_options
+            self.replicate_model_select.value = new_model
+            await self.update_replicate_model(
+                events.ValueChangeEventArguments(
+                    sender=self.replicate_model_select,
+                    value=new_model,
+                    client=ui.client,
+                )
+            )
             await asyncio.to_thread(self.save_settings)
             ui.notify(f"Model '{new_model}' added successfully", type="positive")
             dialog.close()
@@ -343,23 +349,23 @@ class ImageGeneratorGUI:
     async def delete_user_model(self, model, dialog):
         if model in self.user_added_models:
             del self.user_added_models[model]
-            self.user_model_select.options = list(self.user_added_models.keys())
-            if self.user_model_select.value == model:
-                self.user_model_select.value = None
+            self.model_options = list(self.user_added_models.keys())
+            self.replicate_model_select.options = self.model_options
+            if self.replicate_model_select.value == model:
+                self.replicate_model_select.value = None
+                await self.update_replicate_model(
+                    events.ValueChangeEventArguments(
+                        sender=self.replicate_model_select, value=None, client=ui.client
+                    )
+                )
             await asyncio.to_thread(self.save_settings)
             ui.notify(f"Model '{model}' deleted successfully", type="positive")
             dialog.close()
         else:
             ui.notify("Cannot delete this model", type="negative")
 
-    async def select_user_model(self, e):
-        if e.value:
-            self.replicate_model_input.value = e.value
-            await self.update_replicate_model(e)
-            self.user_model_select.value = None
-
     async def update_replicate_model(self, e):
-        new_model = self.replicate_model_input.value
+        new_model = e.value
         if new_model:
             await asyncio.to_thread(self.image_generator.set_model, new_model)
             self.replicate_model = new_model
@@ -367,7 +373,7 @@ class ImageGeneratorGUI:
             logger.info(f"Replicate model updated to: {new_model}")
             self.generate_button.enable()
         else:
-            logger.warning("Empty Replicate model provided")
+            logger.warning("No Replicate model selected")
             self.generate_button.disable()
 
     async def update_folder_path(self, e):
@@ -416,23 +422,23 @@ class ImageGeneratorGUI:
         logger.info("Settings reset to default values")
 
     async def start_generation(self):
-        if not self.replicate_model_input.value:
+        if not self.replicate_model_select.value:
             ui.notify(
-                "Please set a Replicate model before generating images.",
+                "Please select a Replicate model before generating images.",
                 type="negative",
             )
             logger.warning(
-                "Attempted to generate images without setting a Replicate model"
+                "Attempted to generate images without selecting a Replicate model"
             )
             return
 
         await asyncio.to_thread(
-            self.image_generator.set_model, self.replicate_model_input.value
+            self.image_generator.set_model, self.replicate_model_select.value
         )
 
         await asyncio.to_thread(self.save_settings)
         params = {
-            "prompt": self.prompt,
+            "prompt": self.prompt_input.value,
             "flux_model": self.flux_model,
             "aspect_ratio": self.aspect_ratio,
             "num_outputs": self.num_outputs,
@@ -510,14 +516,21 @@ class ImageGeneratorGUI:
         for attr in self._attributes:
             setattr(self, attr, local_settings.get(attr, default_settings.get(attr)))
 
-        self.user_added_models = local_settings.get("user_models", {})
+        models = local_settings.get("models", default_settings.get("models", {}))
+        self.user_added_models = {
+            model: model for model in models.get("user_added", [])
+        }
+
+        self.model_options = list(self.user_added_models.keys())
+        self.replicate_model = local_settings.get("replicate_model", "")
 
     def save_settings(self):
         settings_dict = {}
         for attr in self._attributes:
             settings_dict[attr] = getattr(self, attr)
-        settings_dict["user_models"] = self.user_added_models
-        settings_dict["replicate_model"] = self.replicate_model_input.value
+
+        settings_dict["models"] = {"user_added": list(self.user_added_models.keys())}
+        settings_dict["replicate_model"] = self.replicate_model_select.value
 
         with open("settings.local.toml", "w") as f:
             toml.dump({"default": settings_dict}, f)
