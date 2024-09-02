@@ -10,7 +10,7 @@ import httpx
 import toml
 from config import settings
 from loguru import logger
-from nicegui import events, ui
+from nicegui import ui
 
 logger.remove()
 logger.add(
@@ -20,11 +20,13 @@ logger.add("gui.log", rotation="10 MB", format="{time} {level} {message}", level
 
 DOCKERIZED = os.environ.get("DOCKER_CONTAINER", False)
 
+SETTINGS_LOCAL_FILE = "settings.local.toml"
+
 
 class Lightbox:
     def __init__(self):
         with ui.dialog().props("maximized").classes("bg-black") as self.dialog:
-            ui.keyboard(self._handle_key)
+            self.dialog.on_key = self._handle_key
             self.large_image = ui.image().props("no-spinner fit=scale-down")
         self.image_list = []
 
@@ -35,15 +37,15 @@ class Lightbox:
         ):
             return ui.image(thumb_url)
 
-    def _handle_key(self, event_args: events.KeyEventArguments) -> None:
-        if not event_args.action.keydown:
+    def _handle_key(self, e) -> None:
+        if not e.action.keydown:
             return
-        if event_args.key.escape:
+        if e.key.escape:
             self.dialog.close()
         image_index = self.image_list.index(self.large_image.source)
-        if event_args.key.arrow_left and image_index > 0:
+        if e.key.arrow_left and image_index > 0:
             self._open(self.image_list[image_index - 1])
-        if event_args.key.arrow_right and image_index < len(self.image_list) - 1:
+        if e.key.arrow_right and image_index < len(self.image_list) - 1:
             self._open(self.image_list[image_index + 1])
 
     def _open(self, url: str) -> None:
@@ -86,7 +88,6 @@ class ImageGeneratorGUI:
                 str(Path.home() / "Downloads") if not DOCKERIZED else "/app/output"
             )
 
-        self.setup_ui()
         logger.info("ImageGeneratorGUI initialized")
 
     def setup_ui(self):
@@ -114,12 +115,14 @@ class ImageGeneratorGUI:
                     options=self.model_options,
                     label="Replicate Model",
                     value=self.replicate_model,
-                    on_change=self.update_replicate_model,
+                    on_change=lambda e: asyncio.create_task(
+                        self.update_replicate_model(e.value)
+                    ),
                 )
                 .classes("w-5/6")
                 .tooltip("Select or manage Replicate models")
             )
-            ui.button(icon="add").classes("w-1/6").on(
+            ui.button(icon="settings_suggest").classes("w-1/6").on(
                 "click", self.open_user_model_popup
             )
 
@@ -280,7 +283,7 @@ class ImageGeneratorGUI:
             .bind_value(self, "disable_safety_checker")
         )
         self.reset_button = ui.button(
-            "Reset to Default", on_click=self.reset_to_default
+            "Reset Parameters", on_click=self.reset_to_default
         ).classes(
             "w-1/2 bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded"
         )
@@ -305,89 +308,77 @@ class ImageGeneratorGUI:
             "w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded"
         )
 
+    @ui.refreshable
+    def model_list(self):
+        for model in self.user_added_models:
+            with ui.row().classes("w-full justify-between items-center"):
+                ui.label(model)
+                ui.button(
+                    icon="delete",
+                    on_click=lambda m=model: self.confirm_delete_model(m),
+                ).props("flat round color=red")
+
     async def open_user_model_popup(self):
+        async def add_model():
+            await self.add_user_model(new_model_input.value)
+
         with ui.dialog() as dialog, ui.card():
             ui.label("Manage Replicate Models").classes("text-xl font-bold mb-4")
             new_model_input = ui.input(label="Add New Model").classes("w-full mb-4")
-            ui.button(
-                "Add Model",
-                on_click=lambda: self.add_user_model(new_model_input.value, dialog),
-            )
+            ui.button("Add Model", on_click=add_model)
 
             ui.label("Current Models:").classes("mt-4 mb-2")
-            with ui.column().classes("w-full"):
-                for model in self.user_added_models:
-                    with ui.row().classes("w-full justify-between items-center"):
-                        ui.label(model)
-                        ui.button(
-                            icon="delete",
-                            on_click=lambda m=model: self.confirm_delete_model(
-                                m, dialog
-                            ),
-                        ).props("flat round color=red")
+            self.model_list()
 
             ui.button("Close", on_click=dialog.close).classes("mt-4")
         dialog.open()
 
-    async def add_user_model(self, new_model, dialog):
+    async def add_user_model(self, new_model):
         if new_model and new_model not in self.user_added_models:
             self.user_added_models[new_model] = new_model
             self.model_options = list(self.user_added_models.keys())
             self.replicate_model_select.options = self.model_options
             self.replicate_model_select.value = new_model
-            await self.update_replicate_model(
-                events.ValueChangeEventArguments(
-                    sender=self.replicate_model_select,
-                    value=new_model,
-                    client=ui.client,
-                )
-            )
-            await asyncio.to_thread(self.save_settings)
+            await self.update_replicate_model(new_model)
+            await self.save_settings()
             ui.notify(f"Model '{new_model}' added successfully", type="positive")
-            dialog.close()
+            self.model_list.refresh()
         else:
             ui.notify("Invalid model name or model already exists", type="negative")
 
-    async def confirm_delete_model(self, model, parent_dialog):
+    async def confirm_delete_model(self, model):
+        async def delete_model():
+            await self.delete_user_model(model, confirm_dialog)
+
         with ui.dialog() as confirm_dialog, ui.card():
             ui.label(f"Are you sure you want to delete the model '{model}'?").classes(
                 "mb-4"
             )
             with ui.row():
-                ui.button(
-                    "Yes",
-                    on_click=lambda: self.delete_user_model(
-                        model, parent_dialog, confirm_dialog
-                    ),
-                ).classes("mr-2")
+                ui.button("Yes", on_click=delete_model).classes("mr-2")
                 ui.button("No", on_click=confirm_dialog.close)
         confirm_dialog.open()
 
-    async def delete_user_model(self, model, parent_dialog, confirm_dialog):
+    async def delete_user_model(self, model, confirm_dialog):
         if model in self.user_added_models:
             del self.user_added_models[model]
             self.model_options = list(self.user_added_models.keys())
             self.replicate_model_select.options = self.model_options
             if self.replicate_model_select.value == model:
                 self.replicate_model_select.value = None
-                await self.update_replicate_model(
-                    events.ValueChangeEventArguments(
-                        sender=self.replicate_model_select, value=None, client=ui.client
-                    )
-                )
-            await asyncio.to_thread(self.save_settings)
+                await self.update_replicate_model(None)
+            await self.save_settings()
             ui.notify(f"Model '{model}' deleted successfully", type="positive")
             confirm_dialog.close()
-            parent_dialog.close()
+            self.model_list.refresh()
         else:
             ui.notify("Cannot delete this model", type="negative")
 
-    async def update_replicate_model(self, e):
-        new_model = e.value
+    async def update_replicate_model(self, new_model):
         if new_model:
             await asyncio.to_thread(self.image_generator.set_model, new_model)
             self.replicate_model = new_model
-            await asyncio.to_thread(self.save_settings)
+            await self.save_settings()
             logger.info(f"Replicate model updated to: {new_model}")
             self.generate_button.enable()
         else:
@@ -398,7 +389,7 @@ class ImageGeneratorGUI:
         new_path = e.value
         if os.path.isdir(new_path):
             self.output_folder = new_path
-            await asyncio.to_thread(self.save_settings)
+            await self.save_settings()
             logger.info(f"Output folder set to: {self.output_folder}")
             ui.notify(
                 f"Output folder updated to: {self.output_folder}", type="positive"
@@ -416,7 +407,7 @@ class ImageGeneratorGUI:
         else:
             self.width_input.disable()
             self.height_input.disable()
-        await asyncio.to_thread(self.save_settings)
+        await self.save_settings()
         logger.info(f"Custom dimensions toggled: {e.value}")
 
     async def reset_to_default(self):
@@ -424,7 +415,7 @@ class ImageGeneratorGUI:
             default_settings = toml.load(f)["default"]
 
         for attr in self._attributes:
-            if attr in default_settings:
+            if attr in default_settings and attr not in ["models", "replicate_model"]:
                 value = default_settings[attr]
                 setattr(self, attr, value)
                 if hasattr(self, f"{attr}_input"):
@@ -434,10 +425,9 @@ class ImageGeneratorGUI:
                 elif hasattr(self, f"{attr}_switch"):
                     getattr(self, f"{attr}_switch").value = value
 
-        self.user_added_models = {}
-        await asyncio.to_thread(self.save_settings)
-        ui.notify("Settings reset to default values", type="info")
-        logger.info("Settings reset to default values")
+        await self.save_settings()
+        ui.notify("Parameters reset to default values", type="info")
+        logger.info("Parameters reset to default values")
 
     async def start_generation(self):
         if not self.replicate_model_select.value:
@@ -450,11 +440,12 @@ class ImageGeneratorGUI:
             )
             return
 
+        # Run set_model in a separate thread if it's a blocking operation
         await asyncio.to_thread(
             self.image_generator.set_model, self.replicate_model_select.value
         )
 
-        await asyncio.to_thread(self.save_settings)
+        await self.save_settings()
         params = {
             "prompt": self.prompt_input.value,
             "flux_model": self.flux_model,
@@ -481,6 +472,7 @@ class ImageGeneratorGUI:
         logger.info(f"Generating images with params: {json.dumps(params, indent=2)}")
 
         try:
+            # Assuming generate_images is also a blocking operation, we'll run it in a thread too
             output = await asyncio.to_thread(
                 self.image_generator.generate_images, params
             )
@@ -511,10 +503,10 @@ class ImageGeneratorGUI:
                 else:
                     logger.error(f"Failed to download image from {url}")
 
-        self.update_gallery(downloaded_images)
+        await self.update_gallery(downloaded_images)
         ui.notify("Images generated and downloaded successfully!", type="positive")
 
-    def update_gallery(self, image_paths):
+    async def update_gallery(self, image_paths):
         self.gallery_container.clear()
         with self.gallery_container:
             for image_path in image_paths:
@@ -527,8 +519,8 @@ class ImageGeneratorGUI:
             default_settings = toml.load(f)["default"]
 
         local_settings = {}
-        if os.path.exists("settings.local.toml"):
-            with open("settings.local.toml", "r") as f:
+        if os.path.exists(SETTINGS_LOCAL_FILE):
+            with open(SETTINGS_LOCAL_FILE, "r") as f:
                 local_settings = toml.load(f).get("default", {})
 
         for attr in self._attributes:
@@ -542,7 +534,7 @@ class ImageGeneratorGUI:
         self.model_options = list(self.user_added_models.keys())
         self.replicate_model = local_settings.get("replicate_model", "")
 
-    def save_settings(self):
+    async def save_settings(self):
         settings_dict = {}
         for attr in self._attributes:
             settings_dict[attr] = getattr(self, attr)
@@ -550,11 +542,13 @@ class ImageGeneratorGUI:
         settings_dict["models"] = {"user_added": list(self.user_added_models.keys())}
         settings_dict["replicate_model"] = self.replicate_model_select.value
 
-        with open("settings.local.toml", "w") as f:
+        with open(SETTINGS_LOCAL_FILE, "w") as f:
             toml.dump({"default": settings_dict}, f)
 
         logger.info("Settings saved successfully")
 
 
 async def create_gui(image_generator):
-    return ImageGeneratorGUI(image_generator)
+    gui = ImageGeneratorGUI(image_generator)
+    gui.setup_ui()
+    return gui
