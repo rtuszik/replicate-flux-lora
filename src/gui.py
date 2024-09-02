@@ -305,11 +305,11 @@ class ImageGeneratorGUI:
             "w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded"
         )
 
-    def open_user_model_popup(self):
+    async def open_user_model_popup(self):
         with ui.dialog() as dialog, ui.card():
             ui.label("Manage Replicate Models").classes("text-xl font-bold mb-4")
             new_model_input = ui.input(label="Add New Model").classes("w-full mb-4")
-            add_button = ui.button(
+            ui.button(
                 "Add Model",
                 on_click=lambda: self.add_user_model(new_model_input.value, dialog),
             )
@@ -321,7 +321,9 @@ class ImageGeneratorGUI:
                         ui.label(model)
                         ui.button(
                             icon="delete",
-                            on_click=lambda m=model: self.delete_user_model(m, dialog),
+                            on_click=lambda m=model: self.confirm_delete_model(
+                                m, dialog
+                            ),
                         ).props("flat round color=red")
 
             ui.button("Close", on_click=dialog.close).classes("mt-4")
@@ -346,7 +348,22 @@ class ImageGeneratorGUI:
         else:
             ui.notify("Invalid model name or model already exists", type="negative")
 
-    async def delete_user_model(self, model, dialog):
+    async def confirm_delete_model(self, model, parent_dialog):
+        with ui.dialog() as confirm_dialog, ui.card():
+            ui.label(f"Are you sure you want to delete the model '{model}'?").classes(
+                "mb-4"
+            )
+            with ui.row():
+                ui.button(
+                    "Yes",
+                    on_click=lambda: self.delete_user_model(
+                        model, parent_dialog, confirm_dialog
+                    ),
+                ).classes("mr-2")
+                ui.button("No", on_click=confirm_dialog.close)
+        confirm_dialog.open()
+
+    async def delete_user_model(self, model, parent_dialog, confirm_dialog):
         if model in self.user_added_models:
             del self.user_added_models[model]
             self.model_options = list(self.user_added_models.keys())
@@ -360,7 +377,8 @@ class ImageGeneratorGUI:
                 )
             await asyncio.to_thread(self.save_settings)
             ui.notify(f"Model '{model}' deleted successfully", type="positive")
-            dialog.close()
+            confirm_dialog.close()
+            parent_dialog.close()
         else:
             ui.notify("Cannot delete this model", type="negative")
 
