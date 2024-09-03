@@ -8,9 +8,10 @@ from pathlib import Path
 
 import httpx
 import toml
-from config import settings
+from config import get_api_key, settings
+from dynaconf import loaders
 from loguru import logger
-from nicegui import events, ui
+from nicegui import ui
 
 logger.remove()
 logger.add(
@@ -20,11 +21,13 @@ logger.add("gui.log", rotation="10 MB", format="{time} {level} {message}", level
 
 DOCKERIZED = os.environ.get("DOCKER_CONTAINER", False)
 
+SETTINGS_LOCAL_FILE = "settings.local.toml"
+
 
 class Lightbox:
     def __init__(self):
         with ui.dialog().props("maximized").classes("bg-black") as self.dialog:
-            ui.keyboard(self._handle_key)
+            self.dialog.on_key = self._handle_key
             self.large_image = ui.image().props("no-spinner fit=scale-down")
         self.image_list = []
 
@@ -35,15 +38,15 @@ class Lightbox:
         ):
             return ui.image(thumb_url)
 
-    def _handle_key(self, event_args: events.KeyEventArguments) -> None:
-        if not event_args.action.keydown:
+    def _handle_key(self, e) -> None:
+        if not e.action.keydown:
             return
-        if event_args.key.escape:
+        if e.key.escape:
             self.dialog.close()
         image_index = self.image_list.index(self.large_image.source)
-        if event_args.key.arrow_left and image_index > 0:
+        if e.key.arrow_left and image_index > 0:
             self._open(self.image_list[image_index - 1])
-        if event_args.key.arrow_right and image_index < len(self.image_list) - 1:
+        if e.key.arrow_right and image_index < len(self.image_list) - 1:
             self._open(self.image_list[image_index + 1])
 
     def _open(self, url: str) -> None:
@@ -55,9 +58,8 @@ class ImageGeneratorGUI:
     def __init__(self, image_generator):
         self.image_generator = image_generator
         self.settings = settings
-        self.flux_fine_tune_models = self.image_generator.get_flux_fine_tune_models()
         self.user_added_models = {}
-
+        self.api_key = get_api_key() or os.environ.get("REPLICATE_API_KEY", "")
         self._attributes = [
             "prompt",
             "flux_model",
@@ -76,27 +78,25 @@ class ImageGeneratorGUI:
             "replicate_model",
         ]
 
+        for attr in self._attributes:
+            setattr(self, attr, None)
+
         self.load_settings()
 
-        # Set default output folder if not present in settings
         if not self.output_folder:
             self.output_folder = (
                 str(Path.home() / "Downloads") if not DOCKERIZED else "/app/output"
             )
 
-        self.setup_ui()
         logger.info("ImageGeneratorGUI initialized")
-
-    def get_setting(self, key, default=None):
-        return getattr(self, key, default)
 
     def setup_ui(self):
         ui.dark_mode().enable()
+        self.check_api_key()
 
         with ui.grid(columns=2).classes("w-screen h-full gap-4 px-8"):
-            with ui.card().classes("col-span-2"):
-                ui.label("Flux LoRA API").classes("text-2xl font-bold mb-4")
-
+            with ui.card().classes("col-span-full"):
+                self.setup_top_panel()
             with ui.card().classes("h-[70vh] overflow-auto"):
                 self.setup_left_panel()
 
@@ -108,47 +108,29 @@ class ImageGeneratorGUI:
 
         logger.info("UI setup completed")
 
+    def setup_top_panel(self):
+        with ui.card().classes("w-full"):
+            ui.label("Flux LoRA API").classes("text-2xl font-bold")
+            ui.button(
+                icon="settings_suggest", on_click=self.open_settings_popup
+            ).classes("absolute-right")
+
     def setup_left_panel(self):
-        print(f"Available settings: {settings.as_dict()}")
-        self.replicate_model_input = (
-            ui.input("Replicate Model", value=settings.get("replicate_model", ""))
-            .classes("w-full")
-            .tooltip("Enter the Replicate model URL or identifier")
-        )
-        self.replicate_model_input.on("change", self.update_replicate_model)
-
-        self.flux_models_select = (
-            ui.select(
-                options=self.flux_fine_tune_models,
-                label="Flux Fine-Tune Models",
-                value=None,
-                on_change=self.select_flux_model,
+        with ui.row().classes("w-full items-end"):
+            self.replicate_model_select = (
+                ui.select(
+                    options=self.model_options,
+                    label="Replicate Model",
+                    value=self.replicate_model,
+                    on_change=lambda e: asyncio.create_task(
+                        self.update_replicate_model(e.value)
+                    ),
+                )
+                .classes("w-4/6 overflow-hidden")
+                .tooltip("Select or manage Replicate models")
             )
-            .classes("w-full")
-            .tooltip("Select Public Model")
-        )
-        with ui.row().classes("w-full"):
-            self.new_model_input = ui.input(label="Add Custom LoRA").classes("w-3/4")
-            ui.button("Add Custom LoRA Model", on_click=self.add_user_model).classes(
-                "w-1/4"
-            )
-
-        self.user_models_select = ui.select(
-            options=list(self.user_added_models.keys()),
-            label="User Added Models",
-            value=None,
-            on_change=self.select_user_model,
-        ).classes("w-full")
-
-        ui.button("Delete Selected Model", on_click=self.delete_user_model).classes(
-            "w-full"
-        )
-
-        if DOCKERIZED:
-            self.folder_path = self.settings.get("output_folder", str("/app/output"))
-        else:
-            self.folder_path = self.settings.get(
-                "output_folder", str(Path.home() / "Downloads")
+            ui.button(icon="settings_suggest").classes("ml-2").on(
+                "click", self.open_user_model_popup
             )
 
         self.folder_input = ui.input(
@@ -164,7 +146,7 @@ class ImageGeneratorGUI:
             )
             .classes("w-full")
             .tooltip(
-                "Which model to run inferences with. the dev model needs around 28 steps but the schnell model only needs around 4 steps."
+                "Which model to run inferences with. The dev model needs around 28 steps but the schnell model only needs around 4 steps."
             )
             .bind_value(self, "flux_model")
         )
@@ -307,49 +289,11 @@ class ImageGeneratorGUI:
             .tooltip("Disable safety checker for generated images.")
             .bind_value(self, "disable_safety_checker")
         )
-
-    def add_user_model(self):
-        new_model = self.new_model_input.value
-        if new_model and new_model not in self.user_added_models:
-            self.user_added_models[new_model] = new_model
-            self.user_models_select.options = list(self.user_added_models.keys())
-            self.new_model_input.value = ""
-            self.save_settings()
-            ui.notify(f"Model '{new_model}' added successfully", type="positive")
-        else:
-            ui.notify("Invalid model name or model already exists", type="negative")
-
-    def delete_user_model(self):
-        selected_model = self.user_models_select.value
-        if selected_model in self.user_added_models:
-            del self.user_added_models[selected_model]
-            self.user_models_select.options = list(self.user_added_models.keys())
-            self.user_models_select.value = None
-            self.save_settings()
-            ui.notify(f"Model '{selected_model}' deleted successfully", type="positive")
-        else:
-            ui.notify("No model selected for deletion", type="negative")
-
-    def select_user_model(self, e):
-        if e.value:
-            self.replicate_model_input.value = e.value
-            self.update_replicate_model(e)
-            self.user_models_select.value = None
-
-    def update_folder_path(self, e):
-        new_path = e.value
-        if os.path.isdir(new_path):
-            self.output_folder = new_path
-            self.save_settings()
-            logger.info(f"Output folder set to: {self.output_folder}")
-            ui.notify(
-                f"Output folder updated to: {self.output_folder}", type="positive"
-            )
-        else:
-            ui.notify(
-                "Invalid folder path. Please enter a valid directory.", type="negative"
-            )
-            self.folder_input.value = self.output_folder
+        self.reset_button = ui.button(
+            "Reset Parameters", on_click=self.reset_to_default
+        ).classes(
+            "w-1/2 bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded"
+        )
 
     def setup_right_panel(self):
         self.spinner = ui.spinner(type="infinity", size="150px")
@@ -370,46 +314,157 @@ class ImageGeneratorGUI:
         ).classes(
             "w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded"
         )
-        self.reset_button = ui.button(
-            "Reset to Default", on_click=self.reset_to_default
-        ).classes(
-            "w-1/2 bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded"
-        )
 
-    def update_replicate_model(self, e):
-        new_model = self.replicate_model_input.value
+    async def open_settings_popup(self):
+        with ui.dialog() as dialog, ui.card():
+            ui.label("Settings").classes("text-2xl font-bold")
+            api_key_input = ui.input(
+                label="API Key",
+                placeholder="Enter Replicate API Key...",
+                password_toggle_button=True,
+                value=self.api_key,
+            ).classes("w-full")
+
+            async def save_settings():
+                new_api_key = api_key_input.value
+                if new_api_key != self.api_key:
+                    self.api_key = new_api_key
+                    await self.save_api_key()
+                dialog.close()
+                ui.notify("Settings saved successfully", type="positive")
+
+            ui.button("Save Settings", on_click=save_settings).classes("mt-4")
+        dialog.open()
+
+    async def save_api_key(self):
+        settings.set("REPLICATE_API_KEY", self.api_key)
+
+        secrets_dict = {"default": {"REPLICATE_API_KEY": self.api_key}}
+
+        loaders.write(".secrets.toml", secrets_dict)
+
+        os.environ["REPLICATE_API_KEY"] = self.api_key
+
+        self.image_generator.set_api_key(self.api_key)
+
+    @ui.refreshable
+    def model_list(self):
+        for model in self.user_added_models:
+            with ui.row().classes("w-full justify-between items-center"):
+                ui.label(model)
+                ui.button(
+                    icon="delete",
+                    on_click=lambda m=model: self.confirm_delete_model(m),
+                ).props("flat round color=red")
+
+    async def open_user_model_popup(self):
+        async def add_model():
+            await self.add_user_model(new_model_input.value)
+
+        with ui.dialog() as dialog, ui.card():
+            ui.label("Manage Replicate Models").classes("text-xl font-bold mb-4")
+            new_model_input = ui.input(label="Add New Model").classes("w-full mb-4")
+            ui.button("Add Model", on_click=add_model)
+
+            ui.label("Current Models:").classes("mt-4 mb-2")
+            self.model_list()
+
+            ui.button("Close", on_click=dialog.close).classes("mt-4")
+        dialog.open()
+
+    async def add_user_model(self, new_model):
+        if new_model and new_model not in self.user_added_models:
+            self.user_added_models[new_model] = new_model
+            self.model_options = list(self.user_added_models.keys())
+            self.replicate_model_select.options = self.model_options
+            self.replicate_model_select.value = new_model
+            await self.update_replicate_model(new_model)
+            await self.save_settings()
+            ui.notify(f"Model '{new_model}' added successfully", type="positive")
+            self.model_list.refresh()
+        else:
+            ui.notify("Invalid model name or model already exists", type="negative")
+
+    async def confirm_delete_model(self, model):
+        async def delete_model():
+            await self.delete_user_model(model, confirm_dialog)
+
+        with ui.dialog() as confirm_dialog, ui.card():
+            ui.label(f"Are you sure you want to delete the model '{model}'?").classes(
+                "mb-4"
+            )
+            with ui.row():
+                ui.button("Yes", on_click=delete_model).classes("mr-2")
+                ui.button("No", on_click=confirm_dialog.close)
+        confirm_dialog.open()
+
+    async def delete_user_model(self, model, confirm_dialog):
+        if model in self.user_added_models:
+            del self.user_added_models[model]
+            self.model_options = list(self.user_added_models.keys())
+            self.replicate_model_select.options = self.model_options
+            if self.replicate_model_select.value == model:
+                self.replicate_model_select.value = None
+                await self.update_replicate_model(None)
+            await self.save_settings()
+            ui.notify(f"Model '{model}' deleted successfully", type="positive")
+            confirm_dialog.close()
+            self.model_list.refresh()
+        else:
+            ui.notify("Cannot delete this model", type="negative")
+
+    async def update_replicate_model(self, new_model):
         if new_model:
-            self.image_generator.set_model(new_model)
+            await asyncio.to_thread(self.image_generator.set_model, new_model)
             self.replicate_model = new_model
-            self.save_settings()
+            await self.save_settings()
             logger.info(f"Replicate model updated to: {new_model}")
             self.generate_button.enable()
         else:
-            logger.warning("Empty Replicate model provided")
+            logger.warning("No Replicate model selected")
             self.generate_button.disable()
 
-    def select_flux_model(self, e):
-        if e.value:
-            self.replicate_model_input.value = e.value
-            self.update_replicate_model(e)
-            self.flux_models_select.value = None
+    async def update_folder_path(self, e):
+        new_path = e.value
+        if os.path.isdir(new_path):
+            self.output_folder = new_path
+            await self.save_settings()
+            logger.info(f"Output folder set to: {self.output_folder}")
+            ui.notify(
+                f"Output folder updated to: {self.output_folder}", type="positive"
+            )
+        else:
+            ui.notify(
+                "Invalid folder path. Please enter a valid directory.", type="negative"
+            )
+            self.folder_input.value = self.output_folder
 
-    def toggle_custom_dimensions(self, e):
+    async def toggle_custom_dimensions(self, e):
         if e.value == "custom":
             self.width_input.enable()
             self.height_input.enable()
         else:
             self.width_input.disable()
             self.height_input.disable()
-        self.save_settings()
+        await self.save_settings()
         logger.info(f"Custom dimensions toggled: {e.value}")
 
-    def reset_to_default(self):
+    def check_api_key(self):
+        if not self.api_key:
+            ui.notify(
+                "No Replicate API Key found. Please set it in the settings before generating images.",
+                type="warning",
+                close_button="OK",
+                timeout=10000,  # 10 seconds
+                position="top",
+            )
+
+    async def reset_to_default(self):
         with open("settings.toml", "r") as f:
             default_settings = toml.load(f)["default"]
 
         for attr in self._attributes:
-            if attr in default_settings:
+            if attr in default_settings and attr not in ["models", "replicate_model"]:
                 value = default_settings[attr]
                 setattr(self, attr, value)
                 if hasattr(self, f"{attr}_input"):
@@ -419,27 +474,33 @@ class ImageGeneratorGUI:
                 elif hasattr(self, f"{attr}_switch"):
                     getattr(self, f"{attr}_switch").value = value
 
-        self.user_added_models = {}
-        self.save_settings()
-        ui.notify("Settings reset to default values", type="info")
-        logger.info("Settings reset to default values")
+        await self.save_settings()
+        ui.notify("Parameters reset to default values", type="info")
+        logger.info("Parameters reset to default values")
 
     async def start_generation(self):
-        if not self.replicate_model_input.value:
+        if not self.api_key:
             ui.notify(
-                "Please set a Replicate model before generating images.",
+                "Please set your Replicate API Key in the settings.", type="negative"
+            )
+            return
+        if not self.replicate_model_select.value:
+            ui.notify(
+                "Please select a Replicate model before generating images.",
                 type="negative",
             )
             logger.warning(
-                "Attempted to generate images without setting a Replicate model"
+                "Attempted to generate images without selecting a Replicate model"
             )
             return
 
-        self.image_generator.set_model(self.replicate_model_input.value)
+        await asyncio.to_thread(
+            self.image_generator.set_model, self.replicate_model_select.value
+        )
 
-        self.save_settings()
+        await self.save_settings()
         params = {
-            "prompt": self.prompt,
+            "prompt": self.prompt_input.value,
             "flux_model": self.flux_model,
             "aspect_ratio": self.aspect_ratio,
             "num_outputs": self.num_outputs,
@@ -494,10 +555,10 @@ class ImageGeneratorGUI:
                 else:
                     logger.error(f"Failed to download image from {url}")
 
-        self.update_gallery(downloaded_images)
+        await self.update_gallery(downloaded_images)
         ui.notify("Images generated and downloaded successfully!", type="positive")
 
-    def update_gallery(self, image_paths):
+    async def update_gallery(self, image_paths):
         self.gallery_container.clear()
         with self.gallery_container:
             for image_path in image_paths:
@@ -506,35 +567,40 @@ class ImageGeneratorGUI:
                 )
 
     def load_settings(self):
-        # Load default settings
         with open("settings.toml", "r") as f:
             default_settings = toml.load(f)["default"]
 
-        # Load local settings
         local_settings = {}
-        if os.path.exists("settings.local.toml"):
-            with open("settings.local.toml", "r") as f:
+        if os.path.exists(SETTINGS_LOCAL_FILE):
+            with open(SETTINGS_LOCAL_FILE, "r") as f:
                 local_settings = toml.load(f).get("default", {})
 
-        # Merge settings, prioritizing local settings
         for attr in self._attributes:
             setattr(self, attr, local_settings.get(attr, default_settings.get(attr)))
 
-        self.user_added_models = local_settings.get("user_models", {})
+        models = local_settings.get("models", default_settings.get("models", {}))
+        self.user_added_models = {
+            model: model for model in models.get("user_added", [])
+        }
 
-    def save_settings(self):
+        self.model_options = list(self.user_added_models.keys())
+        self.replicate_model = local_settings.get("replicate_model", "")
+
+    async def save_settings(self):
         settings_dict = {}
         for attr in self._attributes:
             settings_dict[attr] = getattr(self, attr)
-        settings_dict["user_models"] = self.user_added_models
-        settings_dict["replicate_model"] = self.replicate_model_input.value
 
-        # Save settings to settings.local.toml
-        with open("settings.local.toml", "w") as f:
+        settings_dict["models"] = {"user_added": list(self.user_added_models.keys())}
+        settings_dict["replicate_model"] = self.replicate_model_select.value
+
+        with open(SETTINGS_LOCAL_FILE, "w") as f:
             toml.dump({"default": settings_dict}, f)
 
         logger.info("Settings saved successfully")
 
 
 async def create_gui(image_generator):
-    return ImageGeneratorGUI(image_generator)
+    gui = ImageGeneratorGUI(image_generator)
+    gui.setup_ui()
+    return gui

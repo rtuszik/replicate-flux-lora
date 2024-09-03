@@ -1,4 +1,5 @@
 import json
+import os
 import sys
 
 import replicate
@@ -23,7 +24,13 @@ logger.add(
 class ImageGenerator:
     def __init__(self):
         self.replicate_model = None
+        self.api_key = None
         logger.info("ImageGenerator initialized")
+
+    def set_api_key(self, api_key):
+        self.api_key = api_key
+        os.environ["REPLICATE_API_KEY"] = api_key
+        logger.info("API key set")
 
     def set_model(self, replicate_model):
         self.replicate_model = replicate_model
@@ -37,11 +44,16 @@ class ImageGenerator:
             logger.error(error_message)
             raise ImageGenerationError(error_message)
 
+        if not self.api_key:
+            error_message = (
+                "No API key set. Please set an API key before generating images."
+            )
+            logger.error(error_message)
+            raise ImageGenerationError(error_message)
+
         try:
-            # Remove the Flux model from params and store it separately
             flux_model = params.pop("flux_model", "dev")
 
-            # Add the Flux model choice to the input parameters
             params["model"] = flux_model
 
             logger.info(
@@ -49,7 +61,8 @@ class ImageGenerator:
             )
             logger.info(f"Using Replicate model: {self.replicate_model}")
 
-            output = replicate.run(self.replicate_model, input=params)
+            client = replicate.Client(api_token=self.api_key)
+            output = client.run(self.replicate_model, input=params)
 
             logger.success(f"Images generated successfully. Output: {output}")
             return output
@@ -57,15 +70,6 @@ class ImageGenerator:
             error_message = f"Error generating images: {str(e)}"
             logger.exception(error_message)
             raise ImageGenerationError(error_message)
-
-    def get_flux_fine_tune_models(self):
-        try:
-            collection = replicate.collections.get("flux-fine-tunes")
-            models = collection.models
-            return [model.name for model in models]
-        except Exception as e:
-            logger.error(f"Error fetching flux-fine-tunes models: {str(e)}")
-            return []
 
 
 class ImageGenerationError(Exception):
