@@ -3,8 +3,10 @@ import json
 import os
 import sys
 import urllib.parse
+import zipfile
 from datetime import datetime
 from pathlib import Path
+
 
 import httpx
 import toml
@@ -31,12 +33,13 @@ class Lightbox:
             self.large_image = ui.image().props("no-spinner fit=scale-down")
         self.image_list = []
 
-    def add_image(self, thumb_url: str, orig_url: str) -> ui.image:
+    def add_image(self, thumb_url: str, orig_url: str, thumb_classes: str = "w-32 h-32 object-cover") -> ui.button:
         self.image_list.append(orig_url)
-        with ui.button(on_click=lambda: self._open(orig_url)).props(
-            "flat dense square"
-        ):
-            return ui.image(thumb_url)
+        button = ui.button(on_click=lambda: self._open(orig_url)).props("flat dense square")
+        with button:
+            ui.image(thumb_url).classes(thumb_classes)
+        return button
+
 
     def _handle_key(self, e) -> None:
         if not e.action.keydown:
@@ -60,6 +63,7 @@ class ImageGeneratorGUI:
         self.settings = settings
         self.user_added_models = {}
         self.api_key = get_api_key() or os.environ.get("REPLICATE_API_KEY", "")
+        self.last_generated_images = []
         self._attributes = [
             "prompt",
             "flux_model",
@@ -94,16 +98,16 @@ class ImageGeneratorGUI:
         ui.dark_mode().enable()
         self.check_api_key()
 
-        with ui.grid(columns=2).classes("w-screen h-full gap-4 px-8"):
+        with ui.grid(columns=2).classes("w-screen max-h-full gap-4 px-8"):
             with ui.card().classes("col-span-full"):
                 self.setup_top_panel()
-            with ui.card().classes("h-[70vh] overflow-auto"):
+            with ui.card().classes("min-h-[60vh] max-h-[70vh] overflow-auto"):
                 self.setup_left_panel()
 
-            with ui.card().classes("h-[70vh] overflow-auto"):
+            with ui.card().classes("min-h-[60vh] max-h-[70vh] overflow-auto"):
                 self.setup_right_panel()
 
-            with ui.card().classes("col-span-2"):
+            with ui.card().classes("col-span-2 max-h-[20vh]"):
                 self.setup_bottom_panel()
 
         logger.info("UI setup completed")
@@ -126,17 +130,13 @@ class ImageGeneratorGUI:
                         self.update_replicate_model(e.value)
                     ),
                 )
-                .classes("w-4/6 overflow-hidden")
+                .classes("w-5/6 overflow-auto mb-2")
                 .tooltip("Select or manage Replicate models")
+                .props("filled")
             )
-            ui.button(icon="settings_suggest").classes("ml-2").on(
+            ui.button(icon="token").classes("ml-2").on(
                 "click", self.open_user_model_popup
             )
-
-        self.folder_input = ui.input(
-            label="Output Folder", value=self.output_folder
-        ).classes("w-full")
-        self.folder_input.on("change", self.update_folder_path)
 
         self.flux_model_select = (
             ui.select(
@@ -144,11 +144,12 @@ class ImageGeneratorGUI:
                 label="Flux Model",
                 value=self.settings.get("flux_model", "dev"),
             )
-            .classes("w-full")
+            .classes("w-full mb-2")
             .tooltip(
                 "Which model to run inferences with. The dev model needs around 28 steps but the schnell model only needs around 4 steps."
             )
             .bind_value(self, "flux_model")
+            .props("filled")
         )
 
         self.aspect_ratio_select = (
@@ -170,11 +171,12 @@ class ImageGeneratorGUI:
                 label="Aspect Ratio",
                 value=self.settings.get("aspect_ratio", "1:1"),
             )
-            .classes("w-full")
+            .classes("w-full mb-2")
             .bind_value(self, "aspect_ratio")
             .tooltip(
                 "Width of the generated image. Optional, only used when aspect_ratio=custom. Must be a multiple of 16 (if it's not, it will be rounded to nearest multiple of 16)"
             )
+            .props("filled")
         )
         self.aspect_ratio_select.on("change", self.toggle_custom_dimensions)
 
@@ -209,6 +211,7 @@ class ImageGeneratorGUI:
             .classes("w-full")
             .bind_value(self, "num_outputs")
             .tooltip("Number of images to output.")
+            .props("filled")
         )
         self.lora_scale_input = (
             ui.number(
@@ -222,6 +225,7 @@ class ImageGeneratorGUI:
             .tooltip(
                 "Determines how strongly the LoRA should be applied. Sane results between 0 and 1."
             )
+            .props("filled")
             .bind_value(self, "lora_scale")
         )
         self.num_inference_steps_input = (
@@ -234,6 +238,7 @@ class ImageGeneratorGUI:
             .classes("w-full")
             .tooltip("Number of Inference Steps")
             .bind_value(self, "num_inference_steps")
+            .props("filled")
         )
         self.guidance_scale_input = (
             ui.number(
@@ -242,10 +247,12 @@ class ImageGeneratorGUI:
                 min=0,
                 max=10,
                 step=0.1,
+                precision=2,
             )
             .classes("w-full")
             .tooltip("Guidance Scale for the diffusion process")
             .bind_value(self, "guidance_scale")
+            .props("filled")
         )
         self.seed_input = (
             ui.number(
@@ -256,6 +263,7 @@ class ImageGeneratorGUI:
             )
             .classes("w-full")
             .bind_value(self, "seed")
+            .props("filled")
         )
         self.output_format_select = (
             ui.select(
@@ -266,6 +274,7 @@ class ImageGeneratorGUI:
             .classes("w-full")
             .tooltip("Format of the output images")
             .bind_value(self, "output_format")
+            .props("filled")
         )
         self.output_quality_input = (
             ui.number(
@@ -279,6 +288,7 @@ class ImageGeneratorGUI:
                 "Quality when saving the output images, from 0 to 100. 100 is best quality, 0 is lowest quality. Not relevant for .png outputs"
             )
             .bind_value(self, "output_quality")
+            .props("filled")
         )
         self.disable_safety_checker_switch = (
             ui.switch(
@@ -288,6 +298,7 @@ class ImageGeneratorGUI:
             .classes("w-full")
             .tooltip("Disable safety checker for generated images.")
             .bind_value(self, "disable_safety_checker")
+            .props("filled")
         )
         self.reset_button = ui.button(
             "Reset Parameters", on_click=self.reset_to_default
@@ -296,9 +307,6 @@ class ImageGeneratorGUI:
         )
 
     def setup_right_panel(self):
-        self.spinner = ui.spinner(type="infinity", size="150px")
-        self.spinner.visible = False
-
         self.gallery_container = ui.column().classes("w-full mt-4")
         self.lightbox = Lightbox()
 
@@ -314,16 +322,20 @@ class ImageGeneratorGUI:
         ).classes(
             "w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded"
         )
-
+        self.progress = ui.linear_progress(show_value=False, size="20px").classes(
+            "w-full mt-0.5"
+        ).props("indeterminate")
+        self.progress.visible = False
+        
     async def open_settings_popup(self):
-        with ui.dialog() as dialog, ui.card():
+        with ui.dialog() as dialog, ui.card().classes("w-1/3"):
             ui.label("Settings").classes("text-2xl font-bold")
             api_key_input = ui.input(
                 label="API Key",
                 placeholder="Enter Replicate API Key...",
-                password_toggle_button=True,
+                password=True,
                 value=self.api_key,
-            ).classes("w-full")
+            ).classes("w-full mb-4")
 
             async def save_settings():
                 new_api_key = api_key_input.value
@@ -332,7 +344,10 @@ class ImageGeneratorGUI:
                     await self.save_api_key()
                 dialog.close()
                 ui.notify("Settings saved successfully", type="positive")
-
+            self.folder_input = ui.input(
+                label="Output Folder", value=self.output_folder
+            ).classes("w-full mb-4")
+            self.folder_input.on("change", self.update_folder_path)
             ui.button("Save Settings", on_click=save_settings).classes("mt-4")
         dialog.open()
 
@@ -520,7 +535,7 @@ class ImageGeneratorGUI:
             params["seed"] = self.seed
 
         self.generate_button.disable()
-        self.spinner.visible = True
+        self.progress.visible = True
         ui.notify("Generating images...", type="info")
         logger.info(f"Generating images with params: {json.dumps(params, indent=2)}")
 
@@ -536,7 +551,41 @@ class ImageGeneratorGUI:
             logger.exception(error_message)
         finally:
             self.generate_button.enable()
-            self.spinner.visible = False
+            self.progress.visible = False
+
+    def create_zip_file(self):
+        if not self.last_generated_images:
+            ui.notify("No images to download", type="warning")
+            return None
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        zip_filename = f"generated_images_{timestamp}.zip"
+        zip_path = Path(self.output_folder) / zip_filename
+
+        with zipfile.ZipFile(zip_path, 'w') as zipf:
+            for image_path in self.last_generated_images:
+                zipf.write(image_path, Path(image_path).name)
+
+        return str(zip_path)
+    
+    def download_zip(self):
+        zip_path = self.create_zip_file()
+        if zip_path:
+            ui.download(zip_path)
+            ui.notify("Downloading zip file of generated images", type="positive")
+
+    async def update_gallery(self, image_paths):
+        self.gallery_container.clear()
+        self.last_generated_images = image_paths
+        with self.gallery_container:
+            with ui.row().classes('w-full justify-between items-center'):
+                ui.label("Generated Images").classes('text-xl font-bold')
+                ui.button("Download All", on_click=self.download_zip).classes(
+                    "bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded"
+                )
+            with ui.grid(columns=2).classes('md:grid-cols-3 lg:grid-cols-4 w-full gap-2'):
+                for image_path in image_paths:
+                    self.lightbox.add_image(image_path, image_path, "w-full h-full object-cover")
 
     async def download_and_display_images(self, image_urls):
         downloaded_images = []
@@ -558,13 +607,6 @@ class ImageGeneratorGUI:
         await self.update_gallery(downloaded_images)
         ui.notify("Images generated and downloaded successfully!", type="positive")
 
-    async def update_gallery(self, image_paths):
-        self.gallery_container.clear()
-        with self.gallery_container:
-            for image_path in image_paths:
-                self.lightbox.add_image(image_path, image_path).classes(
-                    "w-32 h-32 object-cover m-1"
-                )
 
     def load_settings(self):
         with open("settings.toml", "r") as f:
