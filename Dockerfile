@@ -14,6 +14,7 @@ RUN python -m pip install -r requirements.txt
 
 # Copy the application source code to the working directory
 COPY src/ .
+COPY settings.toml .
 
 # Expose the desired port
 EXPOSE 8080
