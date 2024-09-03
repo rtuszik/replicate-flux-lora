@@ -78,7 +78,6 @@ class ImageGeneratorGUI:
             "replicate_model",
         ]
 
-        # Initialize attributes
         for attr in self._attributes:
             setattr(self, attr, None)
 
@@ -457,6 +456,7 @@ class ImageGeneratorGUI:
                 type="warning",
                 close_button="OK",
                 timeout=10000,  # 10 seconds
+                position="top",
             )
 
     async def reset_to_default(self):
@@ -494,7 +494,6 @@ class ImageGeneratorGUI:
             )
             return
 
-        # Run set_model in a separate thread if it's a blocking operation
         await asyncio.to_thread(
             self.image_generator.set_model, self.replicate_model_select.value
         )
@@ -526,7 +525,6 @@ class ImageGeneratorGUI:
         logger.info(f"Generating images with params: {json.dumps(params, indent=2)}")
 
         try:
-            # Assuming generate_images is also a blocking operation, we'll run it in a thread too
             output = await asyncio.to_thread(
                 self.image_generator.generate_images, params
             )
