@@ -157,6 +157,3 @@ cython_debug/
 settings.json
 settings.local.toml
 .secrets.toml
-
-settings.local.toml
-settings.toml
