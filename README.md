@@ -1,9 +1,12 @@
 ![Super-Linter](https://github.com/rtuszik/replicate-flux-lora/actions/workflows/super-linter.yml/badge.svg)
 ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/rtuszik/replicate-flux-lora/docker-build-push.yml)
+![GitHub Release](https://img.shields.io/github/v/release/rtuszik/replicate-flux-lora)
+![GitHub commit activity](https://img.shields.io/github/commit-activity/w/rtuszik/replicate-flux-lora)
+![GitHub License](https://img.shields.io/github/license/rtuszik/replicate-flux-lora)
 
 # Flux LoRA Image Generator 🚀
 
-![Application Screenshot](assets/screenshot_1.png)
+![Application Screenshot](assets/main-page.png)
 
 A powerful and user-friendly GUI application for generating images using the Replicate API and Flux LoRA models. This tool provides an intuitive interface for controlling various parameters of image generation, making it accessible for both beginners and advanced users.
 
