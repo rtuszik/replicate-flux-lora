@@ -8,7 +8,8 @@ from pathlib import Path
 
 import httpx
 import toml
-from config import settings
+from config import get_api_key, settings
+from dynaconf import loaders
 from loguru import logger
 from nicegui import ui
 
@@ -58,7 +59,7 @@ class ImageGeneratorGUI:
         self.image_generator = image_generator
         self.settings = settings
         self.user_added_models = {}
-
+        self.api_key = get_api_key() or os.environ.get("REPLICATE_API_KEY", "")
         self._attributes = [
             "prompt",
             "flux_model",
@@ -92,11 +93,11 @@ class ImageGeneratorGUI:
 
     def setup_ui(self):
         ui.dark_mode().enable()
+        self.check_api_key()
 
         with ui.grid(columns=2).classes("w-screen h-full gap-4 px-8"):
-            with ui.card().classes("col-span-2"):
-                ui.label("Flux LoRA API").classes("text-2xl font-bold mb-4")
-
+            with ui.card().classes("col-span-full"):
+                self.setup_top_panel()
             with ui.card().classes("h-[70vh] overflow-auto"):
                 self.setup_left_panel()
 
@@ -108,8 +109,15 @@ class ImageGeneratorGUI:
 
         logger.info("UI setup completed")
 
+    def setup_top_panel(self):
+        with ui.card().classes("w-full"):
+            ui.label("Flux LoRA API").classes("text-2xl font-bold")
+            ui.button(
+                icon="settings_suggest", on_click=self.open_settings_popup
+            ).classes("absolute-right")
+
     def setup_left_panel(self):
-        with ui.row().classes("w-full"):
+        with ui.row().classes("w-full items-end"):
             self.replicate_model_select = (
                 ui.select(
                     options=self.model_options,
@@ -119,10 +127,10 @@ class ImageGeneratorGUI:
                         self.update_replicate_model(e.value)
                     ),
                 )
-                .classes("w-5/6")
+                .classes("w-4/6 overflow-hidden")
                 .tooltip("Select or manage Replicate models")
             )
-            ui.button(icon="settings_suggest").classes("w-1/6").on(
+            ui.button(icon="settings_suggest").classes("ml-2").on(
                 "click", self.open_user_model_popup
             )
 
@@ -308,6 +316,38 @@ class ImageGeneratorGUI:
             "w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded"
         )
 
+    async def open_settings_popup(self):
+        with ui.dialog() as dialog, ui.card():
+            ui.label("Settings").classes("text-2xl font-bold")
+            api_key_input = ui.input(
+                label="API Key",
+                placeholder="Enter Replicate API Key...",
+                password_toggle_button=True,
+                value=self.api_key,
+            ).classes("w-full")
+
+            async def save_settings():
+                new_api_key = api_key_input.value
+                if new_api_key != self.api_key:
+                    self.api_key = new_api_key
+                    await self.save_api_key()
+                dialog.close()
+                ui.notify("Settings saved successfully", type="positive")
+
+            ui.button("Save Settings", on_click=save_settings).classes("mt-4")
+        dialog.open()
+
+    async def save_api_key(self):
+        settings.set("REPLICATE_API_KEY", self.api_key)
+
+        secrets_dict = {"default": {"REPLICATE_API_KEY": self.api_key}}
+
+        loaders.write(".secrets.toml", secrets_dict)
+
+        os.environ["REPLICATE_API_KEY"] = self.api_key
+
+        self.image_generator.set_api_key(self.api_key)
+
     @ui.refreshable
     def model_list(self):
         for model in self.user_added_models:
@@ -410,6 +450,15 @@ class ImageGeneratorGUI:
         await self.save_settings()
         logger.info(f"Custom dimensions toggled: {e.value}")
 
+    def check_api_key(self):
+        if not self.api_key:
+            ui.notify(
+                "No Replicate API Key found. Please set it in the settings before generating images.",
+                type="warning",
+                close_button="OK",
+                timeout=10000,  # 10 seconds
+            )
+
     async def reset_to_default(self):
         with open("settings.toml", "r") as f:
             default_settings = toml.load(f)["default"]
@@ -430,6 +479,11 @@ class ImageGeneratorGUI:
         logger.info("Parameters reset to default values")
 
     async def start_generation(self):
+        if not self.api_key:
+            ui.notify(
+                "Please set your Replicate API Key in the settings.", type="negative"
+            )
+            return
         if not self.replicate_model_select.value:
             ui.notify(
                 "Please select a Replicate model before generating images.",

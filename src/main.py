@@ -1,5 +1,6 @@
 import sys
 
+from config import get_api_key
 from gui import create_gui
 from loguru import logger
 from nicegui import ui
@@ -18,6 +19,12 @@ logger.info("Initializing ImageGenerator")
 generator = ImageGenerator()
 
 
+api_key = get_api_key()
+if api_key:
+    generator.set_api_key(api_key)
+else:
+    logger.warning("No Replicate API Key found. Please set it in the settings.")
+
 logger.info("Creating and setting up GUI")
 
 
@@ -29,4 +36,4 @@ async def main_page():
 
 logger.info("Starting NiceGUI server")
 
-ui.run(title="Replicate Flux LoRA", port=8080)
+ui.run(title="Replicate Flux LoRA", port=8080, favicon="🚀")

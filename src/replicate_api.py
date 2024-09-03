@@ -1,4 +1,5 @@
 import json
+import os
 import sys
 
 import replicate
@@ -23,7 +24,13 @@ logger.add(
 class ImageGenerator:
     def __init__(self):
         self.replicate_model = None
+        self.api_key = None
         logger.info("ImageGenerator initialized")
+
+    def set_api_key(self, api_key):
+        self.api_key = api_key
+        os.environ["REPLICATE_API_KEY"] = api_key
+        logger.info("API key set")
 
     def set_model(self, replicate_model):
         self.replicate_model = replicate_model
@@ -33,6 +40,13 @@ class ImageGenerator:
         if not self.replicate_model:
             error_message = (
                 "No Replicate model set. Please set a model before generating images."
+            )
+            logger.error(error_message)
+            raise ImageGenerationError(error_message)
+
+        if not self.api_key:
+            error_message = (
+                "No API key set. Please set an API key before generating images."
             )
             logger.error(error_message)
             raise ImageGenerationError(error_message)
@@ -47,7 +61,8 @@ class ImageGenerator:
             )
             logger.info(f"Using Replicate model: {self.replicate_model}")
 
-            output = replicate.run(self.replicate_model, input=params)
+            client = replicate.Client(api_token=self.api_key)
+            output = client.run(self.replicate_model, input=params)
 
             logger.success(f"Images generated successfully. Output: {output}")
             return output

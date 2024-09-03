@@ -7,3 +7,7 @@ settings = Dynaconf(
     load_dotenv=True,
     lowercase_read=False,
 )
+
+
+def get_api_key():
+    return settings.get("REPLICATE_API_KEY") or settings.get("replicate_api_key")
