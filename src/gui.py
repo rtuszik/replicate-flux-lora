@@ -7,7 +7,6 @@ import zipfile
 from datetime import datetime
 from pathlib import Path
 
-
 import httpx
 import toml
 from config import get_api_key, settings
@@ -33,13 +32,19 @@ class Lightbox:
             self.large_image = ui.image().props("no-spinner fit=scale-down")
         self.image_list = []
 
-    def add_image(self, thumb_url: str, orig_url: str, thumb_classes: str = "w-32 h-32 object-cover") -> ui.button:
+    def add_image(
+        self,
+        thumb_url: str,
+        orig_url: str,
+        thumb_classes: str = "w-32 h-32 object-cover",
+    ) -> ui.button:
         self.image_list.append(orig_url)
-        button = ui.button(on_click=lambda: self._open(orig_url)).props("flat dense square")
+        button = ui.button(on_click=lambda: self._open(orig_url)).props(
+            "flat dense square"
+        )
         with button:
             ui.image(thumb_url).classes(thumb_classes)
         return button
-
 
     def _handle_key(self, e) -> None:
         if not e.action.keydown:
@@ -98,16 +103,19 @@ class ImageGeneratorGUI:
         ui.dark_mode().enable()
         self.check_api_key()
 
-        with ui.grid(columns=2).classes("w-screen max-h-full gap-4 px-8"):
+        with ui.grid().classes(
+            "w-screen h-screen grid-cols-1 md:grid-cols-2 gap-4 p-4 auto-rows-auto"
+        ):
             with ui.card().classes("col-span-full"):
                 self.setup_top_panel()
-            with ui.card().classes("min-h-[60vh] max-h-[70vh] overflow-auto"):
+
+            with ui.card().classes("row-span-2 overflow-auto"):
                 self.setup_left_panel()
 
-            with ui.card().classes("min-h-[60vh] max-h-[70vh] overflow-auto"):
+            with ui.card().classes("row-span-2 overflow-auto"):
                 self.setup_right_panel()
 
-            with ui.card().classes("col-span-2 max-h-[20vh]"):
+            with ui.card().classes("col-span-full"):
                 self.setup_bottom_panel()
 
         logger.info("UI setup completed")
@@ -322,11 +330,13 @@ class ImageGeneratorGUI:
         ).classes(
             "w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded"
         )
-        self.progress = ui.linear_progress(show_value=False, size="20px").classes(
-            "w-full mt-0.5"
-        ).props("indeterminate")
+        self.progress = (
+            ui.linear_progress(show_value=False, size="20px")
+            .classes("w-full mt-0.5")
+            .props("indeterminate")
+        )
         self.progress.visible = False
-        
+
     async def open_settings_popup(self):
         with ui.dialog() as dialog, ui.card().classes("w-1/3"):
             ui.label("Settings").classes("text-2xl font-bold")
@@ -344,6 +354,7 @@ class ImageGeneratorGUI:
                     await self.save_api_key()
                 dialog.close()
                 ui.notify("Settings saved successfully", type="positive")
+
             self.folder_input = ui.input(
                 label="Output Folder", value=self.output_folder
             ).classes("w-full mb-4")
@@ -562,12 +573,12 @@ class ImageGeneratorGUI:
         zip_filename = f"generated_images_{timestamp}.zip"
         zip_path = Path(self.output_folder) / zip_filename
 
-        with zipfile.ZipFile(zip_path, 'w') as zipf:
+        with zipfile.ZipFile(zip_path, "w") as zipf:
             for image_path in self.last_generated_images:
                 zipf.write(image_path, Path(image_path).name)
 
         return str(zip_path)
-    
+
     def download_zip(self):
         zip_path = self.create_zip_file()
         if zip_path:
@@ -578,14 +589,18 @@ class ImageGeneratorGUI:
         self.gallery_container.clear()
         self.last_generated_images = image_paths
         with self.gallery_container:
-            with ui.row().classes('w-full justify-between items-center'):
-                ui.label("Generated Images").classes('text-xl font-bold')
+            with ui.row().classes("w-full justify-between items-center"):
+                ui.label("Generated Images").classes("text-xl font-bold")
                 ui.button("Download All", on_click=self.download_zip).classes(
                     "bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded"
                 )
-            with ui.grid(columns=2).classes('md:grid-cols-3 lg:grid-cols-4 w-full gap-2'):
+            with ui.grid(columns=2).classes(
+                "md:grid-cols-3 lg:grid-cols-4 w-full gap-2"
+            ):
                 for image_path in image_paths:
-                    self.lightbox.add_image(image_path, image_path, "w-full h-full object-cover")
+                    self.lightbox.add_image(
+                        image_path, image_path, "w-full h-full object-cover"
+                    )
 
     async def download_and_display_images(self, image_urls):
         downloaded_images = []
@@ -606,7 +621,6 @@ class ImageGeneratorGUI:
 
         await self.update_gallery(downloaded_images)
         ui.notify("Images generated and downloaded successfully!", type="positive")
-
 
     def load_settings(self):
         with open("settings.toml", "r") as f:
