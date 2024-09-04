@@ -355,11 +355,12 @@ class ImageGeneratorGUI:
                 dialog.close()
                 ui.notify("Settings saved successfully", type="positive")
 
-            self.folder_input = ui.input(
-                label="Output Folder", value=self.output_folder
-            ).classes("w-full mb-4")
-            self.folder_input.on("change", self.update_folder_path)
-            ui.button("Save Settings", on_click=save_settings).classes("mt-4")
+            if not DOCKERIZED:
+                self.folder_input = ui.input(
+                    label="Output Folder", value=self.output_folder
+                ).classes("w-full mb-4")
+                self.folder_input.on("change", self.update_folder_path)
+                ui.button("Save Settings", on_click=save_settings).classes("mt-4")
         dialog.open()
 
     async def save_api_key(self):
