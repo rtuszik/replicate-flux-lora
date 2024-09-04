@@ -69,6 +69,7 @@ class ImageGeneratorGUI:
         self.user_added_models = {}
         self.api_key = get_api_key() or os.environ.get("REPLICATE_API_KEY", "")
         self.last_generated_images = []
+        self.setup_custom_styles()
         self._attributes = [
             "prompt",
             "flux_model",
@@ -99,33 +100,58 @@ class ImageGeneratorGUI:
 
         logger.info("ImageGeneratorGUI initialized")
 
+    def setup_custom_styles(self):
+        ui.add_head_html("""
+            <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+            <style>
+                body, .q-field__native, .q-btn__content, .q-item__label {
+                    font-family: 'Poppins', sans-serif !important;
+                }
+                .modern-card {
+                    border-radius: 15px;
+                    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                    transition: all 0.3s ease;
+                }
+                .modern-card:hover {
+                    transform: translateY(-5px);
+                    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+                }
+                .modern-button {
+                    border-radius: 8px;
+                    text-transform: uppercase;
+                    font-weight: 600;
+                    letter-spacing: 0.5px;
+                }
+            </style>
+        """)
+
     def setup_ui(self):
         ui.dark_mode().enable()
         self.check_api_key()
 
         with ui.grid().classes(
-            "w-screen h-screen grid-cols-1 md:grid-cols-2 gap-4 p-4 auto-rows-auto"
+            "w-screen h-screen grid-cols-1 md:grid-cols-2 gap-6 p-6 auto-rows-auto bg-gray-900"
         ):
-            with ui.card().classes("col-span-full"):
+            with ui.card().classes("col-span-full modern-card bg-gray-800"):
                 self.setup_top_panel()
 
-            with ui.card().classes("row-span-2 overflow-auto"):
+            with ui.card().classes("row-span-2 overflow-auto modern-card bg-gray-800"):
                 self.setup_left_panel()
 
-            with ui.card().classes("row-span-2 overflow-auto"):
+            with ui.card().classes("row-span-2 overflow-auto modern-card bg-gray-800"):
                 self.setup_right_panel()
 
-            with ui.card().classes("col-span-full"):
+            with ui.card().classes("col-span-full modern-card bg-gray-800"):
                 self.setup_bottom_panel()
 
         logger.info("UI setup completed")
 
     def setup_top_panel(self):
-        with ui.card().classes("w-full"):
+        with ui.card().classes("w-full bg-gray-800"):
             ui.label("Flux LoRA API").classes("text-2xl font-bold")
             ui.button(
                 icon="settings_suggest", on_click=self.open_settings_popup
-            ).classes("absolute-right")
+            ).classes("absolute-right text-gray-400 hover:text-blue-400")
 
     def setup_left_panel(self):
         with ui.row().classes("w-full items-end"):
@@ -138,7 +164,7 @@ class ImageGeneratorGUI:
                         self.update_replicate_model(e.value)
                     ),
                 )
-                .classes("w-5/6 overflow-auto mb-2")
+                .classes("w-full overflow-auto mb-4 text-gray-300")
                 .tooltip("Select or manage Replicate models")
                 .props("filled")
             )
@@ -152,7 +178,7 @@ class ImageGeneratorGUI:
                 label="Flux Model",
                 value=self.settings.get("flux_model", "dev"),
             )
-            .classes("w-full mb-2")
+            .classes("w-full mb-4 text-gray-200")
             .tooltip(
                 "Which model to run inferences with. The dev model needs around 28 steps but the schnell model only needs around 4 steps."
             )
@@ -179,7 +205,7 @@ class ImageGeneratorGUI:
                 label="Aspect Ratio",
                 value=self.settings.get("aspect_ratio", "1:1"),
             )
-            .classes("w-full mb-2")
+            .classes("w-full mb-4 text-gray-200")
             .bind_value(self, "aspect_ratio")
             .tooltip(
                 "Width of the generated image. Optional, only used when aspect_ratio=custom. Must be a multiple of 16 (if it's not, it will be rounded to nearest multiple of 16)"
@@ -315,20 +341,22 @@ class ImageGeneratorGUI:
         )
 
     def setup_right_panel(self):
-        self.gallery_container = ui.column().classes("w-full mt-4")
+        self.gallery_container = ui.column().classes(
+            "w-full mt-4 grid grid-cols-2 gap-4"
+        )
         self.lightbox = Lightbox()
 
     def setup_bottom_panel(self):
         self.prompt_input = (
             ui.textarea("Prompt", value=self.settings.get("prompt", ""))
-            .classes("w-full")
+            .classes("w-full mb-4 text-gray-200")
             .bind_value(self, "prompt")
             .props("clearable")
         )
         self.generate_button = ui.button(
             "Generate Images", on_click=self.start_generation
         ).classes(
-            "w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded"
+            "w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded modern-button"
         )
         self.progress = (
             ui.linear_progress(show_value=False, size="20px")
@@ -338,7 +366,7 @@ class ImageGeneratorGUI:
         self.progress.visible = False
 
     async def open_settings_popup(self):
-        with ui.dialog() as dialog, ui.card().classes("w-1/3"):
+        with ui.dialog() as dialog, ui.card().classes("w-1/3 modern-card bg-gray-800"):
             ui.label("Settings").classes("text-2xl font-bold")
             api_key_input = ui.input(
                 label="API Key",
