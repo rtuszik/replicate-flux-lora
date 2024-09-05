@@ -102,19 +102,19 @@ class ImageGeneratorGUI:
 
     def setup_custom_styles(self):
         ui.add_head_html("""
-            <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+            <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:ital,wght@0,100..700;1,100..700&display=swap" rel="stylesheet">
             <style>
                 body, .q-field__native, .q-btn__content, .q-item__label {
-                    font-family: 'Poppins', sans-serif !important;
+                    font-family: 'Roboto Mono', sans-serif !important;
                 }
                 .modern-card {
                     border-radius: 15px;
-                    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                    box-shadow: 10px 10px 5px rgba(0, 0, 0, 0.1);
                     transition: all 0.3s ease;
                 }
                 .modern-card:hover {
-                    transform: translateY(-5px);
-                    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+                    transform: translateY(-2px);
+                    box-shadow: 10px 10px 5px rgba(0, 0, 0, 0.15);
                 }
                 .modern-button {
                     border-radius: 8px;
@@ -122,39 +122,64 @@ class ImageGeneratorGUI:
                     font-weight: 600;
                     letter-spacing: 0.5px;
                 }
+                @keyframes pulse {
+                    0%, 100% {
+                        opacity: 1;
+                    }
+                    50% {
+                        opacity: .5;
+                    }
+                }
+                }
             </style>
         """)
 
     def setup_ui(self):
-        ui.dark_mode().enable()
+        ui.dark_mode()
         self.check_api_key()
 
         with ui.grid().classes(
-            "w-screen h-screen grid-cols-1 md:grid-cols-2 gap-6 p-6 auto-rows-auto bg-gray-900"
+            "w-full h-screen grid-cols-1 md:grid-cols-2 gap-2 p-4 auto-rows-auto dark:bg-[#1f2328] bg-[#ffffff]"
         ):
-            with ui.card().classes("col-span-full modern-card bg-gray-800"):
+            with ui.card().classes(
+                "col-span-full modern-card dark:bg-[#25292e] bg-[#818b981f] flex-nowrap h-min"
+            ):
                 self.setup_top_panel()
 
-            with ui.card().classes("row-span-2 overflow-auto modern-card bg-gray-800"):
+            with ui.card().classes(
+                "col-span-full modern-card dark:bg-[#25292e] bg-[#818b981f]"
+            ):
+                self.setup_prompt_panel()
+
+            with ui.card().classes(
+                "row-span-2 overflow-auto modern-card dark:bg-[#25292e] bg-[#818b981f]"
+            ):
                 self.setup_left_panel()
 
-            with ui.card().classes("row-span-2 overflow-auto modern-card bg-gray-800"):
+            with ui.card().classes(
+                "row-span-2 overflow-auto modern-card dark:bg-[#25292e] bg-[#818b981f]"
+            ):
                 self.setup_right_panel()
-
-            with ui.card().classes("col-span-full modern-card bg-gray-800"):
-                self.setup_bottom_panel()
 
         logger.info("UI setup completed")
 
     def setup_top_panel(self):
-        with ui.card().classes("w-full bg-gray-800"):
-            ui.label("Flux LoRA API").classes("text-2xl font-bold")
+        with ui.row().classes("w-full items-center"):
+            ui.label("Lumberjack - Replicate API Interface").classes(
+                "text-2xl/loose font-bold"
+            )
+            dark_mode = ui.dark_mode(True)
+            ui.switch().bind_value(dark_mode).classes().props(
+                "dense checked-icon=dark_mode unchecked-icon=light_mode color=blue-7"
+            )
             ui.button(
-                icon="settings_suggest", on_click=self.open_settings_popup
-            ).classes("absolute-right text-gray-400 hover:text-blue-400")
+                icon="settings_suggest",
+                on_click=self.open_settings_popup,
+                color="#0969da",
+            ).classes("absolute-right mr-6 mt-3 mb-3")
 
     def setup_left_panel(self):
-        with ui.row().classes("w-full items-end"):
+        with ui.row().classes("w-full flex-row flex-nowrap"):
             self.replicate_model_select = (
                 ui.select(
                     options=self.model_options,
@@ -164,13 +189,13 @@ class ImageGeneratorGUI:
                         self.update_replicate_model(e.value)
                     ),
                 )
-                .classes("w-full overflow-auto mb-4 text-gray-300")
+                .classes("width-5/6 overflow-auto custom-select")
                 .tooltip("Select or manage Replicate models")
                 .props("filled")
             )
-            ui.button(icon="token").classes("ml-2").on(
+            ui.button(icon="token", color="#0969da").classes("ml-2 mt-1.2").on(
                 "click", self.open_user_model_popup
-            )
+            ).props("size=1.3rem")
 
         self.flux_model_select = (
             ui.select(
@@ -178,7 +203,7 @@ class ImageGeneratorGUI:
                 label="Flux Model",
                 value=self.settings.get("flux_model", "dev"),
             )
-            .classes("w-full mb-4 text-gray-200")
+            .classes("w-full text-gray-200")
             .tooltip(
                 "Which model to run inferences with. The dev model needs around 28 steps but the schnell model only needs around 4 steps."
             )
@@ -186,187 +211,212 @@ class ImageGeneratorGUI:
             .props("filled")
         )
 
-        self.aspect_ratio_select = (
-            ui.select(
-                [
-                    "1:1",
-                    "16:9",
-                    "21:9",
-                    "3:2",
-                    "2:3",
-                    "4:5",
-                    "5:4",
-                    "3:4",
-                    "4:3",
-                    "9:16",
-                    "9:21",
-                    "custom",
-                ],
-                label="Aspect Ratio",
-                value=self.settings.get("aspect_ratio", "1:1"),
-            )
-            .classes("w-full mb-4 text-gray-200")
-            .bind_value(self, "aspect_ratio")
-            .tooltip(
-                "Width of the generated image. Optional, only used when aspect_ratio=custom. Must be a multiple of 16 (if it's not, it will be rounded to nearest multiple of 16)"
-            )
-            .props("filled")
-        )
-        self.aspect_ratio_select.on("change", self.toggle_custom_dimensions)
-
-        with ui.column().classes("w-full").bind_visibility_from(
-            self.aspect_ratio_select, "value", value="custom"
-        ):
-            self.width_input = (
-                ui.number(
-                    "Width", value=self.settings.get("width", 1024), min=256, max=1440
+        with ui.row().classes("w-full flex-nowrap"):
+            self.aspect_ratio_select = (
+                ui.select(
+                    [
+                        "1:1",
+                        "16:9",
+                        "21:9",
+                        "3:2",
+                        "2:3",
+                        "4:5",
+                        "5:4",
+                        "3:4",
+                        "4:3",
+                        "9:16",
+                        "9:21",
+                        "custom",
+                    ],
+                    label="Aspect Ratio",
+                    value=self.settings.get("aspect_ratio", "1:1"),
                 )
-                .classes("w-full")
-                .bind_value(self, "width")
+                .classes("w-1/2 text-gray-200")
+                .bind_value(self, "aspect_ratio")
                 .tooltip(
                     "Width of the generated image. Optional, only used when aspect_ratio=custom. Must be a multiple of 16 (if it's not, it will be rounded to nearest multiple of 16)"
                 )
+                .props("filled")
             )
-            self.height_input = (
+            self.aspect_ratio_select.on("change", self.toggle_custom_dimensions)
+
+            with ui.column().classes("w-full").bind_visibility_from(
+                self.aspect_ratio_select, "value", value="custom"
+            ):
+                self.width_input = (
+                    ui.number(
+                        "Width",
+                        value=self.settings.get("width", 1024),
+                        min=256,
+                        max=1440,
+                    )
+                    .classes("w-full")
+                    .bind_value(self, "width")
+                    .tooltip(
+                        "Width of the generated image. Optional, only used when aspect_ratio=custom. Must be a multiple of 16 (if it's not, it will be rounded to nearest multiple of 16)"
+                    )
+                )
+                self.height_input = (
+                    ui.number(
+                        "Height",
+                        value=self.settings.get("height", 1024),
+                        min=256,
+                        max=1440,
+                    )
+                    .classes("w-full")
+                    .bind_value(self, "height")
+                    .tooltip(
+                        "Height of the generated image. Optional, only used when aspect_ratio=custom. Must be a multiple of 16 (if it's not, it will be rounded to nearest multiple of 16)"
+                    )
+                )
+
+            self.num_outputs_input = (
                 ui.number(
-                    "Height", value=self.settings.get("height", 1024), min=256, max=1440
+                    "Num Outputs",
+                    value=self.settings.get("num_outputs", 1),
+                    min=1,
+                    max=4,
+                )
+                .classes("w-1/2")
+                .bind_value(self, "num_outputs")
+                .tooltip("Number of images to output.")
+                .props("filled")
+            )
+
+        with ui.row().classes("w-full flex-nowrap"):
+            self.lora_scale_input = (
+                ui.number(
+                    "LoRA Scale",
+                    value=self.settings.get("lora_scale", 1),
+                    min=-1,
+                    max=2,
+                    step=0.1,
+                )
+                .classes("w-1/2")
+                .tooltip(
+                    "Determines how strongly the LoRA should be applied. Sane results between 0 and 1."
+                )
+                .props("filled")
+                .bind_value(self, "lora_scale")
+            )
+            self.num_inference_steps_input = (
+                ui.number(
+                    "Num Inference Steps",
+                    value=self.settings.get("num_inference_steps", 28),
+                    min=1,
+                    max=50,
+                )
+                .classes("w-1/2")
+                .tooltip("Number of Inference Steps")
+                .bind_value(self, "num_inference_steps")
+                .props("filled")
+            )
+
+        with ui.row().classes("w-full flex-nowrap"):
+            self.guidance_scale_input = (
+                ui.number(
+                    "Guidance Scale",
+                    value=self.settings.get("guidance_scale", 3.5),
+                    min=0,
+                    max=10,
+                    step=0.1,
+                    precision=2,
+                )
+                .classes("w-1/2")
+                .tooltip("Guidance Scale for the diffusion process")
+                .bind_value(self, "guidance_scale")
+                .props("filled")
+            )
+            self.seed_input = (
+                ui.number(
+                    "Seed",
+                    value=self.settings.get("seed", -1),
+                    min=-2147483648,
+                    max=2147483647,
+                )
+                .classes("w-1/2")
+                .bind_value(self, "seed")
+                .props("filled")
+            )
+
+        with ui.row().classes("w-full flex-nowrap"):
+            self.output_format_select = (
+                ui.select(
+                    ["webp", "jpg", "png"],
+                    label="Output Format",
+                    value=self.settings.get("output_format", "webp"),
                 )
                 .classes("w-full")
-                .bind_value(self, "height")
-                .tooltip(
-                    "Height of the generated image. Optional, only used when aspect_ratio=custom. Must be a multiple of 16 (if it's not, it will be rounded to nearest multiple of 16)"
-                )
+                .tooltip("Format of the output images")
+                .bind_value(self, "output_format")
+                .props("filled")
             )
 
-        self.num_outputs_input = (
-            ui.number(
-                "Num Outputs", value=self.settings.get("num_outputs", 1), min=1, max=4
+            self.output_quality_input = (
+                ui.number(
+                    "Output Quality",
+                    value=self.settings.get("output_quality", 80),
+                    min=0,
+                    max=100,
+                )
+                .classes("w-full")
+                .tooltip(
+                    "Quality when saving the output images, from 0 to 100. 100 is best quality, 0 is lowest quality. Not relevant for .png outputs"
+                )
+                .bind_value(self, "output_quality")
+                .props("filled")
             )
-            .classes("w-full")
-            .bind_value(self, "num_outputs")
-            .tooltip("Number of images to output.")
-            .props("filled")
-        )
-        self.lora_scale_input = (
-            ui.number(
-                "LoRA Scale",
-                value=self.settings.get("lora_scale", 1),
-                min=-1,
-                max=2,
-                step=0.1,
+
+        with ui.row().classes("w-full flex-nowrap"):
+            self.disable_safety_checker_switch = (
+                ui.switch(
+                    "Disable Safety Checker",
+                    value=self.settings.get("disable_safety_checker", True),
+                )
+                .classes("w-1/2")
+                .tooltip("Disable safety checker for generated images.")
+                .bind_value(self, "disable_safety_checker")
+                .props("filled color=blue-8")
             )
-            .classes("w-full")
-            .tooltip(
-                "Determines how strongly the LoRA should be applied. Sane results between 0 and 1."
-            )
-            .props("filled")
-            .bind_value(self, "lora_scale")
-        )
-        self.num_inference_steps_input = (
-            ui.number(
-                "Num Inference Steps",
-                value=self.settings.get("num_inference_steps", 28),
-                min=1,
-                max=50,
-            )
-            .classes("w-full")
-            .tooltip("Number of Inference Steps")
-            .bind_value(self, "num_inference_steps")
-            .props("filled")
-        )
-        self.guidance_scale_input = (
-            ui.number(
-                "Guidance Scale",
-                value=self.settings.get("guidance_scale", 3.5),
-                min=0,
-                max=10,
-                step=0.1,
-                precision=2,
-            )
-            .classes("w-full")
-            .tooltip("Guidance Scale for the diffusion process")
-            .bind_value(self, "guidance_scale")
-            .props("filled")
-        )
-        self.seed_input = (
-            ui.number(
-                "Seed",
-                value=self.settings.get("seed", -1),
-                min=-2147483648,
-                max=2147483647,
-            )
-            .classes("w-full")
-            .bind_value(self, "seed")
-            .props("filled")
-        )
-        self.output_format_select = (
-            ui.select(
-                ["webp", "jpg", "png"],
-                label="Output Format",
-                value=self.settings.get("output_format", "webp"),
-            )
-            .classes("w-full")
-            .tooltip("Format of the output images")
-            .bind_value(self, "output_format")
-            .props("filled")
-        )
-        self.output_quality_input = (
-            ui.number(
-                "Output Quality",
-                value=self.settings.get("output_quality", 80),
-                min=0,
-                max=100,
-            )
-            .classes("w-full")
-            .tooltip(
-                "Quality when saving the output images, from 0 to 100. 100 is best quality, 0 is lowest quality. Not relevant for .png outputs"
-            )
-            .bind_value(self, "output_quality")
-            .props("filled")
-        )
-        self.disable_safety_checker_switch = (
-            ui.switch(
-                "Disable Safety Checker",
-                value=self.settings.get("disable_safety_checker", True),
-            )
-            .classes("w-full")
-            .tooltip("Disable safety checker for generated images.")
-            .bind_value(self, "disable_safety_checker")
-            .props("filled")
-        )
-        self.reset_button = ui.button(
-            "Reset Parameters", on_click=self.reset_to_default
-        ).classes(
-            "w-1/2 bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded"
-        )
+            self.reset_button = ui.button(
+                "Reset Parameters", on_click=self.reset_to_default, color="#cf222e"
+            ).classes("w-1/2 text-white font-bold py-2 px-4 rounded")
 
     def setup_right_panel(self):
-        self.gallery_container = ui.column().classes(
-            "w-full mt-4 grid grid-cols-2 gap-4"
-        )
-        self.lightbox = Lightbox()
+        with ui.row().classes("w-full flex-nowrap"):
+            ui.label("Output").classes("text-center text-2xl font-bold mt-2")
+        ui.separator()
+        with ui.row().classes("w-full flex-nowrap"):
+            self.gallery_container = ui.column().classes(
+                "w-full mt-4 grid grid-cols-2 gap-4"
+            )
+            self.lightbox = Lightbox()
 
-    def setup_bottom_panel(self):
-        self.prompt_input = (
-            ui.textarea("Prompt", value=self.settings.get("prompt", ""))
-            .classes("w-full mb-4 text-gray-200")
-            .bind_value(self, "prompt")
-            .props("clearable")
-        )
-        self.generate_button = ui.button(
-            "Generate Images", on_click=self.start_generation
-        ).classes(
-            "w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded modern-button"
-        )
+    def setup_prompt_panel(self):
+        with ui.row().classes("w-full flex-row flex-nowrap"):
+            self.prompt_input = (
+                ui.textarea("Prompt", value=self.settings.get("prompt", ""))
+                .classes("w-full text-gray-200 shadow-lg")
+                .bind_value(self, "prompt")
+                .props("clearable filled autofocus")
+            )
+            self.generate_button = (
+                ui.button(icon="bolt", on_click=self.start_generation, color="#0969da")
+                .classes("ml-2 font-bold rounded modern-button h-full")
+                .props("size=1.5rem")
+                .style("animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;")
+            )
         self.progress = (
             ui.linear_progress(show_value=False, size="20px")
-            .classes("w-full mt-0.5")
+            .classes("w-full")
             .props("indeterminate")
         )
         self.progress.visible = False
 
     async def open_settings_popup(self):
-        with ui.dialog() as dialog, ui.card().classes("w-1/3 modern-card bg-gray-800"):
+        with ui.dialog() as dialog, ui.card().classes(
+            "w-2/3 modern-card dark:bg-[#25292e] bg-[#818b981f]"
+        ):
             ui.label("Settings").classes("text-2xl font-bold")
             api_key_input = ui.input(
                 label="API Key",
@@ -388,7 +438,9 @@ class ImageGeneratorGUI:
                     label="Output Folder", value=self.output_folder
                 ).classes("w-full mb-4")
                 self.folder_input.on("change", self.update_folder_path)
-                ui.button("Save Settings", on_click=save_settings).classes("mt-4")
+                ui.button(
+                    "Save Settings", on_click=save_settings, color="#818b981f"
+                ).classes("mt-4")
         dialog.open()
 
     async def save_api_key(self):
@@ -410,6 +462,7 @@ class ImageGeneratorGUI:
                 ui.button(
                     icon="delete",
                     on_click=lambda m=model: self.confirm_delete_model(m),
+                    color="#818b981f",
                 ).props("flat round color=red")
 
     async def open_user_model_popup(self):
@@ -419,12 +472,12 @@ class ImageGeneratorGUI:
         with ui.dialog() as dialog, ui.card():
             ui.label("Manage Replicate Models").classes("text-xl font-bold mb-4")
             new_model_input = ui.input(label="Add New Model").classes("w-full mb-4")
-            ui.button("Add Model", on_click=add_model)
+            ui.button("Add Model", on_click=add_model, color="#818b981f")
 
             ui.label("Current Models:").classes("mt-4 mb-2")
             self.model_list()
 
-            ui.button("Close", on_click=dialog.close).classes("mt-4")
+            ui.button("Close", on_click=dialog.close, color="#818b981f").classes("mt-4")
         dialog.open()
 
     async def add_user_model(self, new_model):
@@ -449,8 +502,8 @@ class ImageGeneratorGUI:
                 "mb-4"
             )
             with ui.row():
-                ui.button("Yes", on_click=delete_model).classes("mr-2")
-                ui.button("No", on_click=confirm_dialog.close)
+                ui.button("Yes", on_click=delete_model, color="1f883d").classes("mr-2")
+                ui.button("No", on_click=confirm_dialog.close, color="cf222e")
         confirm_dialog.open()
 
     async def delete_user_model(self, model, confirm_dialog):
@@ -618,18 +671,18 @@ class ImageGeneratorGUI:
         self.gallery_container.clear()
         self.last_generated_images = image_paths
         with self.gallery_container:
-            with ui.row().classes("w-full justify-between items-center"):
-                ui.label("Generated Images").classes("text-xl font-bold")
-                ui.button("Download All", on_click=self.download_zip).classes(
-                    "bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded"
-                )
-            with ui.grid(columns=2).classes(
-                "md:grid-cols-3 lg:grid-cols-4 w-full gap-2"
-            ):
-                for image_path in image_paths:
-                    self.lightbox.add_image(
-                        image_path, image_path, "w-full h-full object-cover"
-                    )
+            with ui.row().classes("w-full justify-between items-right"):
+                ui.button(
+                    "Download All", on_click=self.download_zip, color="#0969da"
+                ).classes("modern-button text-white font-bold py-2 px-4 rounded right")
+            with ui.row().classes("w-full"):
+                with ui.grid(columns=2).classes(
+                    "md:grid-cols-3 lg:grid-cols-4 w-full gap-2"
+                ):
+                    for image_path in image_paths:
+                        self.lightbox.add_image(
+                            image_path, image_path, "w-full h-full object-cover"
+                        )
 
     async def download_and_display_images(self, image_urls):
         downloaded_images = []
