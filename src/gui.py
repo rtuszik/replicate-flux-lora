@@ -443,9 +443,9 @@ class ImageGeneratorGUI:
                     label="Output Folder", value=self.output_folder
                 ).classes("w-full mb-4")
                 self.folder_input.on("change", self.update_folder_path)
-                ui.button(
-                    "Save Settings", on_click=save_settings, color="#818b981f"
-                ).classes("mt-4")
+            ui.button(
+                "Save Settings", on_click=save_settings, color="#818b981f"
+            ).classes("mt-4")
         dialog.open()
 
     async def save_api_key(self):
