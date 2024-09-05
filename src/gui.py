@@ -139,7 +139,7 @@ class ImageGeneratorGUI:
         self.check_api_key()
 
         with ui.grid().classes(
-            "w-full h-screen grid-cols-1 md:grid-cols-2 gap-2 p-4 auto-rows-auto dark:bg-[#1f2328] bg-[#ffffff]"
+            "w-full h-screen md:h-full grid-cols-1 md:grid-cols-2 gap-2 md:gap-5 p-4 md:p-6 dark:bg-[#1f2328] bg-[#ffffff] md:auto-rows-min"
         ):
             with ui.card().classes(
                 "col-span-full modern-card dark:bg-[#25292e] bg-[#818b981f] flex-nowrap h-min"
@@ -211,7 +211,7 @@ class ImageGeneratorGUI:
             .props("filled")
         )
 
-        with ui.row().classes("w-full flex-nowrap"):
+        with ui.row().classes("w-full flex-nowrap md:flex-wrap"):
             self.aspect_ratio_select = (
                 ui.select(
                     [
@@ -231,7 +231,7 @@ class ImageGeneratorGUI:
                     label="Aspect Ratio",
                     value=self.settings.get("aspect_ratio", "1:1"),
                 )
-                .classes("w-1/2 text-gray-200")
+                .classes("w-1/2 md:w-full text-gray-200")
                 .bind_value(self, "aspect_ratio")
                 .tooltip(
                     "Width of the generated image. Optional, only used when aspect_ratio=custom. Must be a multiple of 16 (if it's not, it will be rounded to nearest multiple of 16)"
@@ -277,13 +277,13 @@ class ImageGeneratorGUI:
                     min=1,
                     max=4,
                 )
-                .classes("w-1/2")
+                .classes("w-1/2 md:w-full")
                 .bind_value(self, "num_outputs")
                 .tooltip("Number of images to output.")
                 .props("filled")
             )
 
-        with ui.row().classes("w-full flex-nowrap"):
+        with ui.row().classes("w-full flex-nowrap md:flex-wrap"):
             self.lora_scale_input = (
                 ui.number(
                     "LoRA Scale",
@@ -292,7 +292,7 @@ class ImageGeneratorGUI:
                     max=2,
                     step=0.1,
                 )
-                .classes("w-1/2")
+                .classes("w-1/2 md:w-full")
                 .tooltip(
                     "Determines how strongly the LoRA should be applied. Sane results between 0 and 1."
                 )
@@ -306,13 +306,13 @@ class ImageGeneratorGUI:
                     min=1,
                     max=50,
                 )
-                .classes("w-1/2")
+                .classes("w-1/2 md:w-full")
                 .tooltip("Number of Inference Steps")
                 .bind_value(self, "num_inference_steps")
                 .props("filled")
             )
 
-        with ui.row().classes("w-full flex-nowrap"):
+        with ui.row().classes("w-full flex-nowrap md:flex-wrap"):
             self.guidance_scale_input = (
                 ui.number(
                     "Guidance Scale",
@@ -322,7 +322,7 @@ class ImageGeneratorGUI:
                     step=0.1,
                     precision=2,
                 )
-                .classes("w-1/2")
+                .classes("w-1/2 md:w-full")
                 .tooltip("Guidance Scale for the diffusion process")
                 .bind_value(self, "guidance_scale")
                 .props("filled")
@@ -334,7 +334,7 @@ class ImageGeneratorGUI:
                     min=-2147483648,
                     max=2147483647,
                 )
-                .classes("w-1/2")
+                .classes("w-1/2 md:w-full")
                 .bind_value(self, "seed")
                 .props("filled")
             )
@@ -384,7 +384,12 @@ class ImageGeneratorGUI:
 
     def setup_right_panel(self):
         with ui.row().classes("w-full flex-nowrap"):
-            ui.label("Output").classes("text-center text-2xl font-bold mt-2")
+            ui.label("Output").classes("text-center ml-4 mt-3 w-full").style(
+                "font-size: 230%; font-weight: bold; text-align: left;"
+            )
+            ui.button(
+                "Download Images", on_click=self.download_zip, color="#0969da"
+            ).classes("modern-button text-white font-bold py-2 px-4 rounded")
         ui.separator()
         with ui.row().classes("w-full flex-nowrap"):
             self.gallery_container = ui.column().classes(
@@ -671,14 +676,8 @@ class ImageGeneratorGUI:
         self.gallery_container.clear()
         self.last_generated_images = image_paths
         with self.gallery_container:
-            with ui.row().classes("w-full justify-between items-right"):
-                ui.button(
-                    "Download All", on_click=self.download_zip, color="#0969da"
-                ).classes("modern-button text-white font-bold py-2 px-4 rounded right")
             with ui.row().classes("w-full"):
-                with ui.grid(columns=2).classes(
-                    "md:grid-cols-3 lg:grid-cols-4 w-full gap-2"
-                ):
+                with ui.grid(columns=2).classes("md:grid-cols-3 w-full gap-2"):
                     for image_path in image_paths:
                         self.lightbox.add_image(
                             image_path, image_path, "w-full h-full object-cover"
