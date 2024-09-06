@@ -12,13 +12,12 @@ A powerful and user-friendly GUI application for generating images using the Rep
 
 ## Features
 
-- 🖼️ Generate images using the Replicate API and custom Flux LoRA models
-- 💾 Save generated images to a specified output folder
-- 🔑 Secure API key management through the UI
-- 🖥️ User-friendly GUI
-- 🐳 Docker support for easy deployment
-- 📊 Model management for adding and removing Replicate models
-- 🔄 Asynchronous image generation and download
+- 🖼️ Generate Images Using The Replicate Api And Custom Flux Lora Models
+- 💾 Save Generated Images To A Specified Output Folder Or Through Your Browser
+- 🖥️ User-Friendly Gui
+- 🐳 Docker Support For Easy Deployment
+- 📊 Store Multiple Replicate Models For Quick Switching
+- 🔄 Asynchronous Image Generation And Download
 
 ## Installation
 
@@ -66,6 +65,13 @@ Docker is the recommended way to run this application. Follow these steps to get
 
 In order to fine-tune you own model, please check out Replicate's guide on fine-tuning Flux:
 <https://replicate.com/blog/fine-tune-flux>
+
+## Roadmap:
+- [ ] Option to Store Metadata to Images
+- [ ] Option for Automatic Downloads through Browser
+- [ ] Running Base Flux.1 Models
+- [ ] Run Models with File Input
+- [ ] Cancel Generations
 
 ## API Key Setup
 
