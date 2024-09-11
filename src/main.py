@@ -6,12 +6,15 @@ from loguru import logger
 from nicegui import ui
 from replicate_api import ImageGenerator
 
-logger.remove()
 logger.add(
     sys.stderr, format="{time} {level} {message}", filter="my_module", level="INFO"
 )
 logger.add(
-    "main.log", rotation="10 MB", format="{time} {level} {message}", level="INFO"
+    "app.log",
+    format="{time} {level} {module}:{line} {message}",
+    level="DEBUG",
+    rotation="500 MB",
+    compression="zip",
 )
 
 
@@ -37,8 +40,3 @@ async def main_page():
 logger.info("Starting NiceGUI server")
 
 ui.run(title="Replicate Flux LoRA", port=8080, favicon="🚀")
-
-
-
-
-

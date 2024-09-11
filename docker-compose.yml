@@ -8,4 +8,9 @@ services:
       - "8080:8080"
     volumes:
       - ${HOST_OUTPUT_DIR}:/app/output
+      - replicate-flux-lora-settings:/app/settings
     restart: unless-stopped
+
+
+volumes:
+  replicate-flux-lora-settings:
