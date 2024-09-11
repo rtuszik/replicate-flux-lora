@@ -8,9 +8,7 @@ from datetime import datetime
 from pathlib import Path
 
 import httpx
-import toml
-from config import get_api_key, settings
-from dynaconf import loaders
+from config import get_api_key, get_setting, save_settings, set_setting
 from loguru import logger
 from nicegui import ui
 
@@ -65,8 +63,6 @@ class Lightbox:
 class ImageGeneratorGUI:
     def __init__(self, image_generator):
         self.image_generator = image_generator
-        self.settings = settings
-        self.user_added_models = {}
         self.api_key = get_api_key() or os.environ.get("REPLICATE_API_KEY", "")
         self.last_generated_images = []
         self.setup_custom_styles()
@@ -88,10 +84,25 @@ class ImageGeneratorGUI:
             "replicate_model",
         ]
 
-        for attr in self._attributes:
-            setattr(self, attr, None)
-
+        self.user_added_models = {}
         self.load_settings()
+
+        self.flux_model = get_setting("default", "flux_model", "dev")
+        self.aspect_ratio = get_setting("default", "aspect_ratio", "1:1")
+        self.num_outputs = int(get_setting("default", "num_outputs", "1"))
+        self.lora_scale = float(get_setting("default", "lora_scale", "1"))
+        self.num_inference_steps = int(
+            get_setting("default", "num_inference_steps", "28")
+        )
+        self.guidance_scale = float(get_setting("default", "guidance_scale", "3.5"))
+        self.output_format = get_setting("default", "output_format", "webp")
+        self.output_quality = int(get_setting("default", "output_quality", "80"))
+        self.disable_safety_checker = (
+            get_setting("default", "disable_safety_checker", "False").lower() == "true"
+        )
+        self.width = int(get_setting("default", "width", "1024"))
+        self.height = int(get_setting("default", "height", "1024"))
+        self.seed = int(get_setting("default", "seed", "-1"))
 
         if not self.output_folder:
             self.output_folder = (
@@ -201,7 +212,7 @@ class ImageGeneratorGUI:
             ui.select(
                 ["dev", "schnell"],
                 label="Flux Model",
-                value=self.settings.get("flux_model", "dev"),
+                value=get_setting("default", "flux_model", "dev"),
             )
             .classes("w-full text-gray-200")
             .tooltip(
@@ -229,7 +240,7 @@ class ImageGeneratorGUI:
                         "custom",
                     ],
                     label="Aspect Ratio",
-                    value=self.settings.get("aspect_ratio", "1:1"),
+                    value=get_setting("default", "aspect_ratio", "1:1"),
                 )
                 .classes("w-1/2 md:w-full text-gray-200")
                 .bind_value(self, "aspect_ratio")
@@ -246,7 +257,7 @@ class ImageGeneratorGUI:
                 self.width_input = (
                     ui.number(
                         "Width",
-                        value=self.settings.get("width", 1024),
+                        value=float(get_setting("default", "width", 1024)),
                         min=256,
                         max=1440,
                     )
@@ -259,7 +270,7 @@ class ImageGeneratorGUI:
                 self.height_input = (
                     ui.number(
                         "Height",
-                        value=self.settings.get("height", 1024),
+                        value=float(get_setting("default", "height", 1024)),
                         min=256,
                         max=1440,
                     )
@@ -273,7 +284,7 @@ class ImageGeneratorGUI:
             self.num_outputs_input = (
                 ui.number(
                     "Num Outputs",
-                    value=self.settings.get("num_outputs", 1),
+                    value=int(get_setting("default", "num_outputs", 1)),
                     min=1,
                     max=4,
                 )
@@ -287,7 +298,7 @@ class ImageGeneratorGUI:
             self.lora_scale_input = (
                 ui.number(
                     "LoRA Scale",
-                    value=self.settings.get("lora_scale", 1),
+                    value=float(get_setting("default", "lora_scale", 1)),
                     min=-1,
                     max=2,
                     step=0.1,
@@ -302,7 +313,7 @@ class ImageGeneratorGUI:
             self.num_inference_steps_input = (
                 ui.number(
                     "Num Inference Steps",
-                    value=self.settings.get("num_inference_steps", 28),
+                    value=int(get_setting("default", "num_inference_steps", 28)),
                     min=1,
                     max=50,
                 )
@@ -316,7 +327,7 @@ class ImageGeneratorGUI:
             self.guidance_scale_input = (
                 ui.number(
                     "Guidance Scale",
-                    value=self.settings.get("guidance_scale", 3.5),
+                    value=float(get_setting("default", "guidance_scale", 3.5)),
                     min=0,
                     max=10,
                     step=0.1,
@@ -330,7 +341,7 @@ class ImageGeneratorGUI:
             self.seed_input = (
                 ui.number(
                     "Seed",
-                    value=self.settings.get("seed", -1),
+                    value=int(get_setting("default", "seed", -1)),
                     min=-2147483648,
                     max=2147483647,
                 )
@@ -344,7 +355,7 @@ class ImageGeneratorGUI:
                 ui.select(
                     ["webp", "jpg", "png"],
                     label="Output Format",
-                    value=self.settings.get("output_format", "webp"),
+                    value=get_setting("default", "output_format", "webp"),
                 )
                 .classes("w-full")
                 .tooltip("Format of the output images")
@@ -355,7 +366,7 @@ class ImageGeneratorGUI:
             self.output_quality_input = (
                 ui.number(
                     "Output Quality",
-                    value=self.settings.get("output_quality", 80),
+                    value=int(get_setting("default", "output_quality", 80)),
                     min=0,
                     max=100,
                 )
@@ -371,7 +382,10 @@ class ImageGeneratorGUI:
             self.disable_safety_checker_switch = (
                 ui.switch(
                     "Disable Safety Checker",
-                    value=self.settings.get("disable_safety_checker", True),
+                    value=get_setting(
+                        "default", "disable_safety_checker", fallback="False"
+                    ).lower()
+                    == "true",
                 )
                 .classes("w-1/2")
                 .tooltip("Disable safety checker for generated images.")
@@ -400,7 +414,7 @@ class ImageGeneratorGUI:
     def setup_prompt_panel(self):
         with ui.row().classes("w-full flex-row flex-nowrap"):
             self.prompt_input = (
-                ui.textarea("Prompt", value=self.settings.get("prompt", ""))
+                ui.textarea("Prompt", value=get_setting("default", "prompt", ""))
                 .classes("w-full text-gray-200 shadow-lg")
                 .bind_value(self, "prompt")
                 .props("clearable filled autofocus")
@@ -434,7 +448,10 @@ class ImageGeneratorGUI:
                 new_api_key = api_key_input.value
                 if new_api_key != self.api_key:
                     self.api_key = new_api_key
-                    await self.save_api_key()
+                    set_setting("secrets", "REPLICATE_API_KEY", new_api_key)
+                    await self.save_settings()
+                    os.environ["REPLICATE_API_KEY"] = new_api_key
+                    self.image_generator.set_api_key(new_api_key)
                 dialog.close()
                 ui.notify("Settings saved successfully", type="positive")
 
@@ -449,14 +466,9 @@ class ImageGeneratorGUI:
         dialog.open()
 
     async def save_api_key(self):
-        settings.set("REPLICATE_API_KEY", self.api_key)
-
-        secrets_dict = {"default": {"REPLICATE_API_KEY": self.api_key}}
-
-        loaders.write(".secrets.toml", secrets_dict)
-
+        set_setting("secrets", "REPLICATE_API_KEY", self.api_key)
+        save_settings()
         os.environ["REPLICATE_API_KEY"] = self.api_key
-
         self.image_generator.set_api_key(self.api_key)
 
     @ui.refreshable
@@ -492,22 +504,27 @@ class ImageGeneratorGUI:
             self.replicate_model_select.options = self.model_options
             self.replicate_model_select.value = new_model
             await self.update_replicate_model(new_model)
-            await self.save_settings()
+            models_json = json.dumps(
+                {"user_added": list(self.user_added_models.keys())}
+            )
+            set_setting("default", "models", models_json)
+            save_settings()
             ui.notify(f"Model '{new_model}' added successfully", type="positive")
             self.model_list.refresh()
         else:
             ui.notify("Invalid model name or model already exists", type="negative")
 
     async def confirm_delete_model(self, model):
-        async def delete_model():
-            await self.delete_user_model(model, confirm_dialog)
-
         with ui.dialog() as confirm_dialog, ui.card():
             ui.label(f"Are you sure you want to delete the model '{model}'?").classes(
                 "mb-4"
             )
             with ui.row():
-                ui.button("Yes", on_click=delete_model, color="1f883d").classes("mr-2")
+                ui.button(
+                    "Yes",
+                    on_click=lambda: self.delete_user_model(model, confirm_dialog),
+                    color="1f883d",
+                ).classes("mr-2")
                 ui.button("No", on_click=confirm_dialog.close, color="cf222e")
         confirm_dialog.open()
 
@@ -519,7 +536,11 @@ class ImageGeneratorGUI:
             if self.replicate_model_select.value == model:
                 self.replicate_model_select.value = None
                 await self.update_replicate_model(None)
-            await self.save_settings()
+            models_json = json.dumps(
+                {"user_added": list(self.user_added_models.keys())}
+            )
+            set_setting("default", "models", models_json)
+            save_settings()
             ui.notify(f"Model '{model}' deleted successfully", type="positive")
             confirm_dialog.close()
             self.model_list.refresh()
@@ -538,19 +559,35 @@ class ImageGeneratorGUI:
             self.generate_button.disable()
 
     async def update_folder_path(self, e):
-        new_path = e.value
+        if hasattr(e, "value"):
+            new_path = e.value
+        elif hasattr(e, "sender") and hasattr(e.sender, "value"):
+            new_path = e.sender.value
+        elif hasattr(e, "args") and e.args:
+            new_path = e.args[0]
+        else:
+            new_path = None
+
+        if new_path is None:
+            logger.error("Failed to extract new path from event object")
+            ui.notify("Error updating folder path", type="negative")
+            return
+
         if os.path.isdir(new_path):
             self.output_folder = new_path
-            await self.save_settings()
+            set_setting("default", "output_folder", new_path)
+            save_settings()
             logger.info(f"Output folder set to: {self.output_folder}")
             ui.notify(
                 f"Output folder updated to: {self.output_folder}", type="positive"
             )
         else:
+            logger.warning(f"Invalid folder path: {new_path}")
             ui.notify(
                 "Invalid folder path. Please enter a valid directory.", type="negative"
             )
-            self.folder_input.value = self.output_folder
+            if hasattr(self, "folder_input"):
+                self.folder_input.value = self.output_folder
 
     async def toggle_custom_dimensions(self, e):
         if e.value == "custom":
@@ -573,19 +610,30 @@ class ImageGeneratorGUI:
             )
 
     async def reset_to_default(self):
-        with open("settings.toml", "r") as f:
-            default_settings = toml.load(f)["default"]
-
         for attr in self._attributes:
-            if attr in default_settings and attr not in ["models", "replicate_model"]:
-                value = default_settings[attr]
-                setattr(self, attr, value)
-                if hasattr(self, f"{attr}_input"):
-                    getattr(self, f"{attr}_input").value = value
-                elif hasattr(self, f"{attr}_select"):
-                    getattr(self, f"{attr}_select").value = value
-                elif hasattr(self, f"{attr}_switch"):
-                    getattr(self, f"{attr}_switch").value = value
+            if attr not in ["models", "replicate_model"]:
+                value = get_setting("default", attr)
+                if value is not None:
+                    if attr in [
+                        "num_outputs",
+                        "num_inference_steps",
+                        "width",
+                        "height",
+                        "seed",
+                    ]:
+                        value = int(value)
+                    elif attr in ["lora_scale", "guidance_scale", "output_quality"]:
+                        value = float(value)
+                    elif attr == "disable_safety_checker":
+                        value = value.lower() == "true"
+
+                    setattr(self, attr, value)
+                    if hasattr(self, f"{attr}_input"):
+                        getattr(self, f"{attr}_input").value = value
+                    elif hasattr(self, f"{attr}_select"):
+                        getattr(self, f"{attr}_select").value = value
+                    elif hasattr(self, f"{attr}_switch"):
+                        getattr(self, f"{attr}_switch").value = value
 
         await self.save_settings()
         ui.notify("Parameters reset to default values", type="info")
@@ -704,36 +752,42 @@ class ImageGeneratorGUI:
         ui.notify("Images generated and downloaded successfully!", type="positive")
 
     def load_settings(self):
-        with open("settings.toml", "r") as f:
-            default_settings = toml.load(f)["default"]
-
-        local_settings = {}
-        if os.path.exists(SETTINGS_LOCAL_FILE):
-            with open(SETTINGS_LOCAL_FILE, "r") as f:
-                local_settings = toml.load(f).get("default", {})
-
         for attr in self._attributes:
-            setattr(self, attr, local_settings.get(attr, default_settings.get(attr)))
+            value = get_setting("default", attr)
+            if value is not None:
+                if attr in [
+                    "num_outputs",
+                    "num_inference_steps",
+                    "width",
+                    "height",
+                    "seed",
+                ]:
+                    value = int(value)
+                elif attr in ["lora_scale", "guidance_scale", "output_quality"]:
+                    value = float(value)
+                elif attr == "disable_safety_checker":
+                    value = value.lower() == "true"
+                setattr(self, attr, value)
 
-        models = local_settings.get("models", default_settings.get("models", {}))
+        models_json = get_setting("default", "models", fallback='{"user_added": []}')
+        models = json.loads(models_json)
         self.user_added_models = {
             model: model for model in models.get("user_added", [])
         }
 
         self.model_options = list(self.user_added_models.keys())
-        self.replicate_model = local_settings.get("replicate_model", "")
+        self.replicate_model = get_setting("default", "replicate_model", fallback="")
 
     async def save_settings(self):
-        settings_dict = {}
         for attr in self._attributes:
-            settings_dict[attr] = getattr(self, attr)
+            value = getattr(self, attr)
+            if attr == "models":
+                value = json.dumps({"user_added": list(self.user_added_models.keys())})
+            set_setting("default", attr, str(value))
 
-        settings_dict["models"] = {"user_added": list(self.user_added_models.keys())}
-        settings_dict["replicate_model"] = self.replicate_model_select.value
+        set_setting("default", "replicate_model", self.replicate_model_select.value)
 
-        with open(SETTINGS_LOCAL_FILE, "w") as f:
-            toml.dump({"default": settings_dict}, f)
-
+        save_settings()
         logger.info("Settings saved successfully")
 
 

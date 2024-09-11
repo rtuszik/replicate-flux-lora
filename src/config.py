@@ -1,13 +1,29 @@
-from dynaconf import Dynaconf
+import configparser
+import os
 
-settings = Dynaconf(
-    envvar_prefix="FLUXLORA",
-    settings_files=["settings.toml", "settings.local.toml", ".secrets.toml"],
-    environments=True,
-    load_dotenv=True,
-    lowercase_read=False,
-)
+config = configparser.ConfigParser()
+config.read(["settings.ini", "settings.local.ini"])
 
 
 def get_api_key():
-    return settings.get("REPLICATE_API_KEY") or settings.get("replicate_api_key")
+    return os.environ.get("REPLICATE_API_KEY") or config.get(
+        "secrets", "REPLICATE_API_KEY", fallback=None
+    )
+
+
+def get_setting(section, key, fallback=None):
+    try:
+        return config.get(section, key)
+    except (configparser.NoSectionError, configparser.NoOptionError):
+        return fallback
+
+
+def set_setting(section, key, value):
+    if not config.has_section(section):
+        config.add_section(section)
+    config.set(section, key, str(value))
+
+
+def save_settings():
+    with open("settings.local.ini", "w") as configfile:
+        config.write(configfile)
