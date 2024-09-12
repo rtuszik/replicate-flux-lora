@@ -1,36 +1,27 @@
 import asyncio
 import json
 import os
-import sys
 import urllib.parse
 import zipfile
 from datetime import datetime
 from pathlib import Path
 
 import httpx
-import toml
-from config import get_api_key, settings
-from dynaconf import loaders
+from config import get_api_key, get_setting, save_settings, set_setting
 from loguru import logger
 from nicegui import ui
 
-logger.remove()
-logger.add(
-    sys.stderr, format="{time} {level} {message}", filter="my_module", level="INFO"
-)
-logger.add("gui.log", rotation="10 MB", format="{time} {level} {message}", level="INFO")
-
 DOCKERIZED = os.environ.get("DOCKER_CONTAINER", False)
-
-SETTINGS_LOCAL_FILE = "settings.local.toml"
 
 
 class Lightbox:
     def __init__(self):
+        logger.debug("Initializing Lightbox")
         with ui.dialog().props("maximized").classes("bg-black") as self.dialog:
             self.dialog.on_key = self._handle_key
             self.large_image = ui.image().props("no-spinner fit=scale-down")
         self.image_list = []
+        logger.debug("Lightbox initialized")
 
     def add_image(
         self,
@@ -38,35 +29,41 @@ class Lightbox:
         orig_url: str,
         thumb_classes: str = "w-32 h-32 object-cover",
     ) -> ui.button:
+        logger.debug(f"Adding image to Lightbox: {orig_url}")
         self.image_list.append(orig_url)
         button = ui.button(on_click=lambda: self._open(orig_url)).props(
             "flat dense square"
         )
         with button:
             ui.image(thumb_url).classes(thumb_classes)
+        logger.debug("Image added to Lightbox")
         return button
 
     def _handle_key(self, e) -> None:
+        logger.debug(f"Handling key press in Lightbox: {e.key}")
         if not e.action.keydown:
             return
         if e.key.escape:
+            logger.debug("Closing Lightbox dialog")
             self.dialog.close()
         image_index = self.image_list.index(self.large_image.source)
         if e.key.arrow_left and image_index > 0:
+            logger.debug("Displaying previous image")
             self._open(self.image_list[image_index - 1])
         if e.key.arrow_right and image_index < len(self.image_list) - 1:
+            logger.debug("Displaying next image")
             self._open(self.image_list[image_index + 1])
 
     def _open(self, url: str) -> None:
+        logger.debug(f"Opening image in Lightbox: {url}")
         self.large_image.set_source(url)
         self.dialog.open()
 
 
 class ImageGeneratorGUI:
     def __init__(self, image_generator):
+        logger.info("Initializing ImageGeneratorGUI")
         self.image_generator = image_generator
-        self.settings = settings
-        self.user_added_models = {}
         self.api_key = get_api_key() or os.environ.get("REPLICATE_API_KEY", "")
         self.last_generated_images = []
         self.setup_custom_styles()
@@ -88,19 +85,44 @@ class ImageGeneratorGUI:
             "replicate_model",
         ]
 
-        for attr in self._attributes:
-            setattr(self, attr, None)
+        self.user_added_models = {}
+        self.prompt = get_setting("default", "prompt", "", str)
 
-        self.load_settings()
+        self.flux_model = get_setting("default", "flux_model", "dev", str)
+        self.aspect_ratio = get_setting("default", "aspect_ratio", "1:1", str)
+        self.num_outputs = get_setting("default", "num_outputs", "1", int)
+        self.lora_scale = get_setting("default", "lora_scale", "1", float)
+        self.num_inference_steps = get_setting(
+            "default", "num_inference_steps", "28", int
+        )
+        self.guidance_scale = get_setting("default", "guidance_scale", "3.5", float)
+        self.output_format = get_setting("default", "output_format", "png")
+        self.output_quality = get_setting("default", "output_quality", "80", int)
+        self.disable_safety_checker = get_setting(
+            "default", "disable_safety_checker", True, bool
+        )
 
-        if not self.output_folder:
-            self.output_folder = (
-                str(Path.home() / "Downloads") if not DOCKERIZED else "/app/output"
-            )
+        self.width = get_setting("default", "width", "1024", int)
+        self.height = get_setting("default", "height", "1024", int)
+        self.seed = get_setting("default", "seed", "-1", int)
+
+        self.output_folder = (
+            "/app/output"
+            if DOCKERIZED
+            else get_setting("default", "output_folder", "/Downloads", str)
+        )
+        models_json = get_setting("default", "models", '{"user_added": []}', str)
+        models = json.loads(models_json)
+        self.user_added_models = {
+            model: model for model in models.get("user_added", [])
+        }
+        self.model_options = list(self.user_added_models.keys())
+        self.replicate_model = get_setting("default", "replicate_model", "", str)
 
         logger.info("ImageGeneratorGUI initialized")
 
     def setup_custom_styles(self):
+        logger.debug("Setting up custom styles")
         ui.add_head_html("""
             <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:ital,wght@0,100..700;1,100..700&display=swap" rel="stylesheet">
             <style>
@@ -135,6 +157,7 @@ class ImageGeneratorGUI:
         """)
 
     def setup_ui(self):
+        logger.info("Setting up UI")
         ui.dark_mode()
         self.check_api_key()
 
@@ -164,6 +187,7 @@ class ImageGeneratorGUI:
         logger.info("UI setup completed")
 
     def setup_top_panel(self):
+        logger.debug("Setting up top panel")
         with ui.row().classes("w-full items-center"):
             ui.label("Lumberjack - Replicate API Interface").classes(
                 "text-2xl/loose font-bold"
@@ -179,6 +203,7 @@ class ImageGeneratorGUI:
             ).classes("absolute-right mr-6 mt-3 mb-3")
 
     def setup_left_panel(self):
+        logger.debug("Setting up left panel")
         with ui.row().classes("w-full flex-row flex-nowrap"):
             self.replicate_model_select = (
                 ui.select(
@@ -201,7 +226,7 @@ class ImageGeneratorGUI:
             ui.select(
                 ["dev", "schnell"],
                 label="Flux Model",
-                value=self.settings.get("flux_model", "dev"),
+                value=get_setting("default", "flux_model", "dev"),
             )
             .classes("w-full text-gray-200")
             .tooltip(
@@ -229,7 +254,7 @@ class ImageGeneratorGUI:
                         "custom",
                     ],
                     label="Aspect Ratio",
-                    value=self.settings.get("aspect_ratio", "1:1"),
+                    value=get_setting("default", "aspect_ratio", "1:1"),
                 )
                 .classes("w-1/2 md:w-full text-gray-200")
                 .bind_value(self, "aspect_ratio")
@@ -246,7 +271,7 @@ class ImageGeneratorGUI:
                 self.width_input = (
                     ui.number(
                         "Width",
-                        value=self.settings.get("width", 1024),
+                        value=get_setting("default", "width", 1024, int),
                         min=256,
                         max=1440,
                     )
@@ -259,7 +284,7 @@ class ImageGeneratorGUI:
                 self.height_input = (
                     ui.number(
                         "Height",
-                        value=self.settings.get("height", 1024),
+                        value=get_setting("default", "height", 1024, int),
                         min=256,
                         max=1440,
                     )
@@ -273,7 +298,7 @@ class ImageGeneratorGUI:
             self.num_outputs_input = (
                 ui.number(
                     "Num Outputs",
-                    value=self.settings.get("num_outputs", 1),
+                    value=get_setting("default", "num_outputs", 1, int),
                     min=1,
                     max=4,
                 )
@@ -287,7 +312,7 @@ class ImageGeneratorGUI:
             self.lora_scale_input = (
                 ui.number(
                     "LoRA Scale",
-                    value=self.settings.get("lora_scale", 1),
+                    value=float(get_setting("default", "lora_scale", 1)),
                     min=-1,
                     max=2,
                     step=0.1,
@@ -302,7 +327,7 @@ class ImageGeneratorGUI:
             self.num_inference_steps_input = (
                 ui.number(
                     "Num Inference Steps",
-                    value=self.settings.get("num_inference_steps", 28),
+                    value=get_setting("default", "num_inference_steps", 28, int),
                     min=1,
                     max=50,
                 )
@@ -316,7 +341,7 @@ class ImageGeneratorGUI:
             self.guidance_scale_input = (
                 ui.number(
                     "Guidance Scale",
-                    value=self.settings.get("guidance_scale", 3.5),
+                    value=float(get_setting("default", "guidance_scale", 3.5)),
                     min=0,
                     max=10,
                     step=0.1,
@@ -330,7 +355,7 @@ class ImageGeneratorGUI:
             self.seed_input = (
                 ui.number(
                     "Seed",
-                    value=self.settings.get("seed", -1),
+                    value=get_setting("default", "seed", -1, int),
                     min=-2147483648,
                     max=2147483647,
                 )
@@ -344,7 +369,7 @@ class ImageGeneratorGUI:
                 ui.select(
                     ["webp", "jpg", "png"],
                     label="Output Format",
-                    value=self.settings.get("output_format", "webp"),
+                    value=get_setting("default", "output_format", "webp"),
                 )
                 .classes("w-full")
                 .tooltip("Format of the output images")
@@ -355,7 +380,7 @@ class ImageGeneratorGUI:
             self.output_quality_input = (
                 ui.number(
                     "Output Quality",
-                    value=self.settings.get("output_quality", 80),
+                    value=get_setting("default", "output_quality", 80, int),
                     min=0,
                     max=100,
                 )
@@ -371,7 +396,10 @@ class ImageGeneratorGUI:
             self.disable_safety_checker_switch = (
                 ui.switch(
                     "Disable Safety Checker",
-                    value=self.settings.get("disable_safety_checker", True),
+                    value=get_setting(
+                        "default", "disable_safety_checker", fallback="False"
+                    ).lower()
+                    == "true",
                 )
                 .classes("w-1/2")
                 .tooltip("Disable safety checker for generated images.")
@@ -383,6 +411,7 @@ class ImageGeneratorGUI:
             ).classes("w-1/2 text-white font-bold py-2 px-4 rounded")
 
     def setup_right_panel(self):
+        logger.debug("Setting up right panel")
         with ui.row().classes("w-full flex-nowrap"):
             ui.label("Output").classes("text-center ml-4 mt-3 w-full").style(
                 "font-size: 230%; font-weight: bold; text-align: left;"
@@ -398,9 +427,10 @@ class ImageGeneratorGUI:
             self.lightbox = Lightbox()
 
     def setup_prompt_panel(self):
+        logger.debug("Setting up prompt panel")
         with ui.row().classes("w-full flex-row flex-nowrap"):
             self.prompt_input = (
-                ui.textarea("Prompt", value=self.settings.get("prompt", ""))
+                ui.textarea("Prompt", value=self.prompt)
                 .classes("w-full text-gray-200 shadow-lg")
                 .bind_value(self, "prompt")
                 .props("clearable filled autofocus")
@@ -419,6 +449,7 @@ class ImageGeneratorGUI:
         self.progress.visible = False
 
     async def open_settings_popup(self):
+        logger.debug("Opening settings popup")
         with ui.dialog() as dialog, ui.card().classes(
             "w-2/3 modern-card dark:bg-[#25292e] bg-[#818b981f]"
         ):
@@ -431,10 +462,16 @@ class ImageGeneratorGUI:
             ).classes("w-full mb-4")
 
             async def save_settings():
+                logger.debug("Saving settings")
                 new_api_key = api_key_input.value
                 if new_api_key != self.api_key:
                     self.api_key = new_api_key
-                    await self.save_api_key()
+                    set_setting("secrets", "REPLICATE_API_KEY", new_api_key)
+                    await self.save_settings()
+                    os.environ["REPLICATE_API_KEY"] = new_api_key
+                    self.image_generator.set_api_key(new_api_key)
+                    logger.info("API key saved")
+
                 dialog.close()
                 ui.notify("Settings saved successfully", type="positive")
 
@@ -449,18 +486,15 @@ class ImageGeneratorGUI:
         dialog.open()
 
     async def save_api_key(self):
-        settings.set("REPLICATE_API_KEY", self.api_key)
-
-        secrets_dict = {"default": {"REPLICATE_API_KEY": self.api_key}}
-
-        loaders.write(".secrets.toml", secrets_dict)
-
+        logger.debug("Saving API key")
+        set_setting("secrets", "REPLICATE_API_KEY", self.api_key)
+        save_settings()
         os.environ["REPLICATE_API_KEY"] = self.api_key
-
         self.image_generator.set_api_key(self.api_key)
 
     @ui.refreshable
     def model_list(self):
+        logger.debug("Refreshing model list")
         for model in self.user_added_models:
             with ui.row().classes("w-full justify-between items-center"):
                 ui.label(model)
@@ -471,6 +505,8 @@ class ImageGeneratorGUI:
                 ).props("flat round color=red")
 
     async def open_user_model_popup(self):
+        logger.debug("Opening user model popup")
+
         async def add_model():
             await self.add_user_model(new_model_input.value)
 
@@ -486,32 +522,42 @@ class ImageGeneratorGUI:
         dialog.open()
 
     async def add_user_model(self, new_model):
+        logger.debug(f"Adding user model: {new_model}")
         if new_model and new_model not in self.user_added_models:
             self.user_added_models[new_model] = new_model
             self.model_options = list(self.user_added_models.keys())
             self.replicate_model_select.options = self.model_options
             self.replicate_model_select.value = new_model
             await self.update_replicate_model(new_model)
-            await self.save_settings()
+            models_json = json.dumps(
+                {"user_added": list(self.user_added_models.keys())}
+            )
+            set_setting("default", "models", models_json)
+            save_settings()
             ui.notify(f"Model '{new_model}' added successfully", type="positive")
             self.model_list.refresh()
+            logger.info(f"User model added: {new_model}")
         else:
+            logger.warning(f"Invalid model name or model already exists: {new_model}")
             ui.notify("Invalid model name or model already exists", type="negative")
 
     async def confirm_delete_model(self, model):
-        async def delete_model():
-            await self.delete_user_model(model, confirm_dialog)
-
+        logger.debug(f"Confirming deletion of model: {model}")
         with ui.dialog() as confirm_dialog, ui.card():
             ui.label(f"Are you sure you want to delete the model '{model}'?").classes(
                 "mb-4"
             )
             with ui.row():
-                ui.button("Yes", on_click=delete_model, color="1f883d").classes("mr-2")
+                ui.button(
+                    "Yes",
+                    on_click=lambda: self.delete_user_model(model, confirm_dialog),
+                    color="1f883d",
+                ).classes("mr-2")
                 ui.button("No", on_click=confirm_dialog.close, color="cf222e")
         confirm_dialog.open()
 
     async def delete_user_model(self, model, confirm_dialog):
+        logger.debug(f"Deleting user model: {model}")
         if model in self.user_added_models:
             del self.user_added_models[model]
             self.model_options = list(self.user_added_models.keys())
@@ -519,14 +565,21 @@ class ImageGeneratorGUI:
             if self.replicate_model_select.value == model:
                 self.replicate_model_select.value = None
                 await self.update_replicate_model(None)
-            await self.save_settings()
+            models_json = json.dumps(
+                {"user_added": list(self.user_added_models.keys())}
+            )
+            set_setting("default", "models", models_json)
+            save_settings()
             ui.notify(f"Model '{model}' deleted successfully", type="positive")
             confirm_dialog.close()
             self.model_list.refresh()
+            logger.info(f"User model deleted: {model}")
         else:
+            logger.warning(f"Cannot delete model, not found: {model}")
             ui.notify("Cannot delete this model", type="negative")
 
     async def update_replicate_model(self, new_model):
+        logger.debug(f"Updating Replicate model to: {new_model}")
         if new_model:
             await asyncio.to_thread(self.image_generator.set_model, new_model)
             self.replicate_model = new_model
@@ -538,21 +591,39 @@ class ImageGeneratorGUI:
             self.generate_button.disable()
 
     async def update_folder_path(self, e):
-        new_path = e.value
+        logger.debug("Updating folder path")
+        if hasattr(e, "value"):
+            new_path = e.value
+        elif hasattr(e, "sender") and hasattr(e.sender, "value"):
+            new_path = e.sender.value
+        elif hasattr(e, "args") and e.args:
+            new_path = e.args[0]
+        else:
+            new_path = None
+
+        if new_path is None:
+            logger.error("Failed to extract new path from event object")
+            ui.notify("Error updating folder path", type="negative")
+            return
+
         if os.path.isdir(new_path):
             self.output_folder = new_path
-            await self.save_settings()
+            set_setting("default", "output_folder", new_path)
+            save_settings()
             logger.info(f"Output folder set to: {self.output_folder}")
             ui.notify(
                 f"Output folder updated to: {self.output_folder}", type="positive"
             )
         else:
+            logger.warning(f"Invalid folder path: {new_path}")
             ui.notify(
                 "Invalid folder path. Please enter a valid directory.", type="negative"
             )
-            self.folder_input.value = self.output_folder
+            if hasattr(self, "folder_input"):
+                self.folder_input.value = self.output_folder
 
     async def toggle_custom_dimensions(self, e):
+        logger.debug(f"Toggling custom dimensions: {e.value}")
         if e.value == "custom":
             self.width_input.enable()
             self.height_input.enable()
@@ -563,7 +634,9 @@ class ImageGeneratorGUI:
         logger.info(f"Custom dimensions toggled: {e.value}")
 
     def check_api_key(self):
+        logger.debug("Checking API key")
         if not self.api_key:
+            logger.warning("No Replicate API Key found.")
             ui.notify(
                 "No Replicate API Key found. Please set it in the settings before generating images.",
                 type="warning",
@@ -573,29 +646,44 @@ class ImageGeneratorGUI:
             )
 
     async def reset_to_default(self):
-        with open("settings.toml", "r") as f:
-            default_settings = toml.load(f)["default"]
-
+        logger.debug("Resetting parameters to default values")
         for attr in self._attributes:
-            if attr in default_settings and attr not in ["models", "replicate_model"]:
-                value = default_settings[attr]
-                setattr(self, attr, value)
-                if hasattr(self, f"{attr}_input"):
-                    getattr(self, f"{attr}_input").value = value
-                elif hasattr(self, f"{attr}_select"):
-                    getattr(self, f"{attr}_select").value = value
-                elif hasattr(self, f"{attr}_switch"):
-                    getattr(self, f"{attr}_switch").value = value
+            if attr not in ["models", "replicate_model"]:
+                value = get_setting("default", attr)
+                if value is not None:
+                    if attr in [
+                        "num_outputs",
+                        "num_inference_steps",
+                        "width",
+                        "height",
+                        "seed",
+                        "output_quality",
+                    ]:
+                        value = int(value)
+                    elif attr in ["lora_scale", "guidance_scale"]:
+                        value = float(value)
+                    elif attr == "disable_safety_checker":
+                        value = value.lower() == "true"
+
+                    setattr(self, attr, value)
+                    if hasattr(self, f"{attr}_input"):
+                        getattr(self, f"{attr}_input").value = value
+                    elif hasattr(self, f"{attr}_select"):
+                        getattr(self, f"{attr}_select").value = value
+                    elif hasattr(self, f"{attr}_switch"):
+                        getattr(self, f"{attr}_switch").value = value
 
         await self.save_settings()
         ui.notify("Parameters reset to default values", type="info")
         logger.info("Parameters reset to default values")
 
     async def start_generation(self):
+        logger.debug("Starting image generation")
         if not self.api_key:
             ui.notify(
                 "Please set your Replicate API Key in the settings.", type="negative"
             )
+            logger.error("Cannot start generation: No API key set.")
             return
         if not self.replicate_model_select.value:
             ui.notify(
@@ -652,8 +740,10 @@ class ImageGeneratorGUI:
             self.progress.visible = False
 
     def create_zip_file(self):
+        logger.debug("Creating zip file of generated images")
         if not self.last_generated_images:
             ui.notify("No images to download", type="warning")
+            logger.warning("No images to zip")
             return None
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -663,16 +753,18 @@ class ImageGeneratorGUI:
         with zipfile.ZipFile(zip_path, "w") as zipf:
             for image_path in self.last_generated_images:
                 zipf.write(image_path, Path(image_path).name)
-
+        logger.info(f"Zip file created: {zip_path}")
         return str(zip_path)
 
     def download_zip(self):
+        logger.debug("Downloading zip file")
         zip_path = self.create_zip_file()
         if zip_path:
             ui.download(zip_path)
             ui.notify("Downloading zip file of generated images", type="positive")
 
     async def update_gallery(self, image_paths):
+        logger.debug("Updating image gallery")
         self.gallery_container.clear()
         self.last_generated_images = image_paths
         with self.gallery_container:
@@ -682,11 +774,14 @@ class ImageGeneratorGUI:
                         self.lightbox.add_image(
                             image_path, image_path, "w-full h-full object-cover"
                         )
+        logger.debug("Image gallery updated")
 
     async def download_and_display_images(self, image_urls):
+        logger.debug("Downloading and displaying generated images")
         downloaded_images = []
         async with httpx.AsyncClient() as client:
             for i, url in enumerate(image_urls):
+                logger.debug(f"Downloading image from {url}")
                 response = await client.get(url)
                 if response.status_code == 200:
                     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -702,42 +797,25 @@ class ImageGeneratorGUI:
 
         await self.update_gallery(downloaded_images)
         ui.notify("Images generated and downloaded successfully!", type="positive")
-
-    def load_settings(self):
-        with open("settings.toml", "r") as f:
-            default_settings = toml.load(f)["default"]
-
-        local_settings = {}
-        if os.path.exists(SETTINGS_LOCAL_FILE):
-            with open(SETTINGS_LOCAL_FILE, "r") as f:
-                local_settings = toml.load(f).get("default", {})
-
-        for attr in self._attributes:
-            setattr(self, attr, local_settings.get(attr, default_settings.get(attr)))
-
-        models = local_settings.get("models", default_settings.get("models", {}))
-        self.user_added_models = {
-            model: model for model in models.get("user_added", [])
-        }
-
-        self.model_options = list(self.user_added_models.keys())
-        self.replicate_model = local_settings.get("replicate_model", "")
+        logger.success("Images downloaded and displayed")
 
     async def save_settings(self):
-        settings_dict = {}
+        logger.debug("Saving settings")
         for attr in self._attributes:
-            settings_dict[attr] = getattr(self, attr)
+            value = getattr(self, attr)
+            if attr == "models":
+                value = json.dumps({"user_added": list(self.user_added_models.keys())})
+            set_setting("default", attr, str(value))
 
-        settings_dict["models"] = {"user_added": list(self.user_added_models.keys())}
-        settings_dict["replicate_model"] = self.replicate_model_select.value
+        set_setting("default", "replicate_model", self.replicate_model_select.value)
 
-        with open(SETTINGS_LOCAL_FILE, "w") as f:
-            toml.dump({"default": settings_dict}, f)
-
+        save_settings()
         logger.info("Settings saved successfully")
 
 
 async def create_gui(image_generator):
+    logger.debug("Creating GUI")
     gui = ImageGeneratorGUI(image_generator)
     gui.setup_ui()
+    logger.debug("GUI created")
     return gui

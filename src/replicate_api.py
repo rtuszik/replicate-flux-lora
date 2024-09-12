@@ -1,24 +1,11 @@
 import json
 import os
-import sys
 
 import replicate
 from dotenv import load_dotenv
 from loguru import logger
 
 load_dotenv()
-
-# Configure Loguru
-logger.remove()
-logger.add(
-    sys.stderr, format="{time} {level} {message}", filter="my_module", level="INFO"
-)
-logger.add(
-    "replicate.log",
-    rotation="10 MB",
-    format="{time} {level} {message}",
-    level="INFO",
-)
 
 
 class ImageGenerator:

@@ -154,6 +154,6 @@ dmypy.json
 # Cython debug symbols
 cython_debug/
 
-settings.json
-settings.local.toml
-.secrets.toml
+
+*code-workspace
+settings.user.ini
