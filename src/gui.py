@@ -524,19 +524,26 @@ class ImageGeneratorGUI:
     async def add_user_model(self, new_model):
         logger.debug(f"Adding user model: {new_model}")
         if new_model and new_model not in self.user_added_models:
-            self.user_added_models[new_model] = new_model
-            self.model_options = list(self.user_added_models.keys())
-            self.replicate_model_select.options = self.model_options
-            self.replicate_model_select.value = new_model
-            await self.update_replicate_model(new_model)
-            models_json = json.dumps(
-                {"user_added": list(self.user_added_models.keys())}
-            )
-            set_setting("default", "models", models_json)
-            save_settings()
-            ui.notify(f"Model '{new_model}' added successfully", type="positive")
-            self.model_list.refresh()
-            logger.info(f"User model added: {new_model}")
+            try:
+                latest_v = await asyncio.to_thread(
+                    self.image_generator.get_model_version, new_model
+                )
+                self.user_added_models[new_model] = latest_v
+                self.model_options = list(self.user_added_models.values())
+                self.replicate_model_select.options = self.model_options
+                self.replicate_model_select.value = latest_v
+                await self.update_replicate_model(latest_v)
+                models_json = json.dumps(
+                    {"user_added": list(self.user_added_models.values())}
+                )
+                set_setting("default", "models", models_json)
+                save_settings()
+                ui.notify(f"Model '{latest_v}' added successfully", type="positive")
+                self.model_list.refresh()
+                logger.info(f"User model added: {latest_v}")
+            except Exception as e:
+                logger.error(f"Error adding model: {str(e)}")
+                ui.notify(f"Error adding model: {str(e)}", type="negative")
         else:
             logger.warning(f"Invalid model name or model already exists: {new_model}")
             ui.notify("Invalid model name or model already exists", type="negative")
