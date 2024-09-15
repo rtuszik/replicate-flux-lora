@@ -37,8 +37,11 @@ Docker is the recommended way to run this application. Follow these steps to get
        ports:
          - "8080:8080"
        volumes:
+         - replicate-flux-lora-settings:/app/settings
          - ${HOST_OUTPUT_DIR}:/app/output
        restart: unless-stopped
+   volumes:
+     replicate-flux-lora-settings:
    ```
 
 4. Replace `/path/to/your/output/directory` with the actual path where you want to save the generated images on your host machine.
@@ -66,7 +69,8 @@ Docker is the recommended way to run this application. Follow these steps to get
 In order to fine-tune you own model, please check out Replicate's guide on fine-tuning Flux:
 <https://replicate.com/blog/fine-tune-flux>
 
-## Roadmap:
+## Roadmap
+
 - [ ] Option to Store Metadata to Images
 - [ ] Option for Automatic Downloads through Browser
 - [ ] Running Base Flux.1 Models
@@ -93,4 +97,3 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 [GPLv3](LICENSE)
 
 ---
-
