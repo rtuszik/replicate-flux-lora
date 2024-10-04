@@ -243,7 +243,7 @@ class GUIPanels:
             )
             ui.button(
                 "Download Images",
-                on_click=FileHandler.download_zip(self),
+                on_click=lambda: FileHandler.download_zip(self.last_generated_images, self.output_folder),
                 color="blue-4",
             ).classes("modern-button text-white font-bold py-2 px-4 rounded")
         ui.separator()
