@@ -1,3 +1,4 @@
+import asyncio
 from nicegui import ui
 from loguru import logger
 from util.settings import Settings

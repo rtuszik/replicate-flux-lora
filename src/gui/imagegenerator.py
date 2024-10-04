@@ -147,7 +147,7 @@ class ImageGeneratorGUI:
     async def save_api_key(self):
         logger.debug("Saving API key")
         Settings.set_setting("secrets", "REPLICATE_API_KEY", self.api_key)
-        save_settings()
+        Settings.save_settings()
         os.environ["REPLICATE_API_KEY"] = self.api_key
         self.image_generator.set_api_key(self.api_key)
 
@@ -170,7 +170,7 @@ class ImageGeneratorGUI:
         if os.path.isdir(new_path):
             self.output_folder = new_path
             Settings.set_setting("default", "output_folder", new_path)
-            save_settings()
+            Settings.save_settings()
             logger.info(f"Output folder set to: {self.output_folder}")
             ui.notify(
                 f"Output folder updated to: {self.output_folder}", type="positive"
