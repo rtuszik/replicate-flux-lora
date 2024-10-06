@@ -1,10 +1,9 @@
 import sys
 
-from config import get_api_key
-from gui import create_gui
 from loguru import logger
 from nicegui import ui
-from replicate_api import ImageGenerator
+import util
+from gui import ImageGeneratorGUI
 
 logger.add(
     sys.stderr, format="{time} {level} {message}", filter="my_module", level="INFO"
@@ -19,10 +18,10 @@ logger.add(
 
 
 logger.info("Initializing ImageGenerator")
-generator = ImageGenerator()
+generator = util.Replicate_API()
 
 
-api_key = get_api_key()
+api_key = util.Settings.get_api_key()
 if api_key:
     generator.set_api_key(api_key)
 else:
@@ -33,8 +32,10 @@ logger.info("Creating and setting up GUI")
 
 @ui.page("/")
 async def main_page():
-    await create_gui(generator)
-    logger.info("NiceGUI server is running")
+    logger.debug("Creating GUI")
+    gui = ImageGeneratorGUI(generator)
+    gui.setup_ui()
+    logger.debug("GUI created")
 
 
 logger.info("Starting NiceGUI server")
