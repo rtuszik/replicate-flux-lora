@@ -5,6 +5,7 @@ from util.settings import Settings
 from gui.lightbox import Lightbox
 from gui.usermodels import UserModels
 from gui.filehandler import FileHandler
+from gui.styles import Styles
 
 
 class GUIPanels:
@@ -14,7 +15,7 @@ class GUIPanels:
             ui.label("Lumberjack - Replicate API Interface").classes(
                 "text-2xl/loose font-bold"
             )
-            dark_mode = ui.dark_mode(True)
+            # dark_mode = ui.dark_mode(True)
             # ui.switch().bind_value(dark_mode).classes().props(
             #     "dense checked-icon=dark_mode unchecked-icon=light_mode color=blue-4"
             # )
@@ -244,7 +245,9 @@ class GUIPanels:
             )
             ui.button(
                 "Download Images",
-                on_click=lambda: FileHandler.download_zip(self.last_generated_images, self.output_folder),
+                on_click=lambda: FileHandler.download_zip(
+                    self.last_generated_images, self.output_folder
+                ),
                 color="blue-4",
             ).classes("modern-button text-white font-bold py-2 px-4 rounded")
         ui.separator()

@@ -22,7 +22,7 @@ class ImageGeneratorGUI:
         self.image_generator = image_generator
         self.api_key = Settings.get_api_key() or os.environ.get("REPLICATE_API_KEY", "")
         self.last_generated_images = []
-        self.custo_styles = Styles.setup_custom_styles()
+        self.custom_styles = Styles.setup_custom_styles()
         self._attributes = [
             "prompt",
             "flux_model",
@@ -87,7 +87,7 @@ class ImageGeneratorGUI:
 
     def setup_ui(self):
         logger.info("Setting up UI")
-        ui.dark_mode()
+        ui.dark_mode(True)
         self.check_api_key()
 
         with ui.grid().classes(
