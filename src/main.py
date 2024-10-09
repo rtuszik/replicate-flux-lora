@@ -11,7 +11,7 @@ logger.add(
 logger.add(
     "app.log",
     format="{time} {level} {module}:{line} {message}",
-    level="DEBUG",
+    level="INFO",
     rotation="500 MB",
     compression="zip",
 )
@@ -19,7 +19,6 @@ logger.add(
 
 logger.info("Initializing ImageGenerator")
 generator = util.Replicate_API()
-
 
 api_key = util.Settings.get_api_key()
 if api_key:

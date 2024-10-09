@@ -157,6 +157,7 @@ class GUIPanels:
                     ),
                     min=1,
                     max=50,
+                    precision=0,
                 )
                 .classes("w-1/2 md:w-full")
                 .tooltip("Number of Inference Steps")
