@@ -7,7 +7,7 @@ from datetime import datetime
 from pathlib import Path
 
 import httpx
-from config import get_api_key, get_setting, save_settings, set_setting
+from util import Settings
 from loguru import logger
 from nicegui import ui
 
@@ -64,7 +64,7 @@ class ImageGeneratorGUI:
     def __init__(self, image_generator):
         logger.info("Initializing ImageGeneratorGUI")
         self.image_generator = image_generator
-        self.api_key = get_api_key() or os.environ.get("REPLICATE_API_KEY", "")
+        self.api_key = Settings.get_api_key() or os.environ.get("REPLICATE_API_KEY", "")
         self.last_generated_images = []
         self.setup_custom_styles()
         self._attributes = [
@@ -86,38 +86,46 @@ class ImageGeneratorGUI:
         ]
 
         self.user_added_models = {}
-        self.prompt = get_setting("default", "prompt", "", str)
+        self.prompt = Settings.get_setting("default", "prompt", "", str)
 
-        self.flux_model = get_setting("default", "flux_model", "dev", str)
-        self.aspect_ratio = get_setting("default", "aspect_ratio", "1:1", str)
-        self.num_outputs = get_setting("default", "num_outputs", "1", int)
-        self.lora_scale = get_setting("default", "lora_scale", "1", float)
-        self.num_inference_steps = get_setting(
+        self.flux_model = Settings.get_setting("default", "flux_model", "dev", str)
+        self.aspect_ratio = Settings.get_setting("default", "aspect_ratio", "1:1", str)
+        self.num_outputs = Settings.get_setting("default", "num_outputs", "1", int)
+        self.lora_scale = Settings.get_setting("default", "lora_scale", "1", float)
+        self.num_inference_steps = Settings.get_setting(
             "default", "num_inference_steps", "28", int
         )
-        self.guidance_scale = get_setting("default", "guidance_scale", "3.5", float)
-        self.output_format = get_setting("default", "output_format", "png")
-        self.output_quality = get_setting("default", "output_quality", "80", int)
-        self.disable_safety_checker = get_setting(
+        self.guidance_scale = Settings.get_setting(
+            "default", "guidance_scale", "3.5", float
+        )
+        self.output_format = Settings.get_setting("default", "output_format", "png")
+        self.output_quality = Settings.get_setting(
+            "default", "output_quality", "80", int
+        )
+        self.disable_safety_checker = Settings.get_setting(
             "default", "disable_safety_checker", True, bool
         )
 
-        self.width = get_setting("default", "width", "1024", int)
-        self.height = get_setting("default", "height", "1024", int)
-        self.seed = get_setting("default", "seed", "-1", int)
+        self.width = Settings.get_setting("default", "width", "1024", int)
+        self.height = Settings.get_setting("default", "height", "1024", int)
+        self.seed = Settings.get_setting("default", "seed", "-1", int)
 
         self.output_folder = (
             "/app/output"
             if DOCKERIZED
-            else get_setting("default", "output_folder", "/Downloads", str)
+            else Settings.get_setting("default", "output_folder", "/Downloads", str)
         )
-        models_json = get_setting("default", "models", '{"user_added": []}', str)
+        models_json = Settings.get_setting(
+            "default", "models", '{"user_added": []}', str
+        )
         models = json.loads(models_json)
         self.user_added_models = {
             model: model for model in models.get("user_added", [])
         }
         self.model_options = list(self.user_added_models.keys())
-        self.replicate_model = get_setting("default", "replicate_model", "", str)
+        self.replicate_model = Settings.get_setting(
+            "default", "replicate_model", "", str
+        )
 
         logger.info("ImageGeneratorGUI initialized")
 
@@ -226,7 +234,7 @@ class ImageGeneratorGUI:
             ui.select(
                 ["dev", "schnell"],
                 label="Flux Model",
-                value=get_setting("default", "flux_model", "dev"),
+                value=Settings.get_setting("default", "flux_model", "dev"),
             )
             .classes("w-full text-gray-200")
             .tooltip(
@@ -254,7 +262,7 @@ class ImageGeneratorGUI:
                         "custom",
                     ],
                     label="Aspect Ratio",
-                    value=get_setting("default", "aspect_ratio", "1:1"),
+                    value=Settings.get_setting("default", "aspect_ratio", "1:1"),
                 )
                 .classes("w-1/2 md:w-full text-gray-200")
                 .bind_value(self, "aspect_ratio")
@@ -271,7 +279,7 @@ class ImageGeneratorGUI:
                 self.width_input = (
                     ui.number(
                         "Width",
-                        value=get_setting("default", "width", 1024, int),
+                        value=Settings.get_setting("default", "width", 1024, int),
                         min=256,
                         max=1440,
                     )
@@ -284,7 +292,7 @@ class ImageGeneratorGUI:
                 self.height_input = (
                     ui.number(
                         "Height",
-                        value=get_setting("default", "height", 1024, int),
+                        value=Settings.get_setting("default", "height", 1024, int),
                         min=256,
                         max=1440,
                     )
@@ -298,7 +306,7 @@ class ImageGeneratorGUI:
             self.num_outputs_input = (
                 ui.number(
                     "Num Outputs",
-                    value=get_setting("default", "num_outputs", 1, int),
+                    value=Settings.get_setting("default", "num_outputs", 1, int),
                     min=1,
                     max=4,
                 )
@@ -312,7 +320,7 @@ class ImageGeneratorGUI:
             self.lora_scale_input = (
                 ui.number(
                     "LoRA Scale",
-                    value=float(get_setting("default", "lora_scale", 1)),
+                    value=float(Settings.get_setting("default", "lora_scale", 1)),
                     min=-1,
                     max=2,
                     step=0.1,
@@ -327,7 +335,9 @@ class ImageGeneratorGUI:
             self.num_inference_steps_input = (
                 ui.number(
                     "Num Inference Steps",
-                    value=get_setting("default", "num_inference_steps", 28, int),
+                    value=Settings.get_setting(
+                        "default", "num_inference_steps", 28, int
+                    ),
                     min=1,
                     max=50,
                 )
@@ -341,7 +351,7 @@ class ImageGeneratorGUI:
             self.guidance_scale_input = (
                 ui.number(
                     "Guidance Scale",
-                    value=float(get_setting("default", "guidance_scale", 3.5)),
+                    value=float(Settings.get_setting("default", "guidance_scale", 3.5)),
                     min=0,
                     max=10,
                     step=0.1,
@@ -355,7 +365,7 @@ class ImageGeneratorGUI:
             self.seed_input = (
                 ui.number(
                     "Seed",
-                    value=get_setting("default", "seed", -1, int),
+                    value=Settings.get_setting("default", "seed", -1, int),
                     min=-2147483648,
                     max=2147483647,
                 )
@@ -369,7 +379,7 @@ class ImageGeneratorGUI:
                 ui.select(
                     ["webp", "jpg", "png"],
                     label="Output Format",
-                    value=get_setting("default", "output_format", "webp"),
+                    value=Settings.get_setting("default", "output_format", "webp"),
                 )
                 .classes("w-full")
                 .tooltip("Format of the output images")
@@ -380,7 +390,7 @@ class ImageGeneratorGUI:
             self.output_quality_input = (
                 ui.number(
                     "Output Quality",
-                    value=get_setting("default", "output_quality", 80, int),
+                    value=Settings.get_setting("default", "output_quality", 80, int),
                     min=0,
                     max=100,
                 )
@@ -396,7 +406,7 @@ class ImageGeneratorGUI:
             self.disable_safety_checker_switch = (
                 ui.switch(
                     "Disable Safety Checker",
-                    value=get_setting(
+                    value=Settings.get_setting(
                         "default", "disable_safety_checker", fallback="False"
                     ).lower()
                     == "true",
@@ -466,7 +476,7 @@ class ImageGeneratorGUI:
                 new_api_key = api_key_input.value
                 if new_api_key != self.api_key:
                     self.api_key = new_api_key
-                    set_setting("secrets", "REPLICATE_API_KEY", new_api_key)
+                    Settings.set_setting("secrets", "REPLICATE_API_KEY", new_api_key)
                     await self.save_settings()
                     os.environ["REPLICATE_API_KEY"] = new_api_key
                     self.image_generator.set_api_key(new_api_key)
@@ -481,14 +491,14 @@ class ImageGeneratorGUI:
                 ).classes("w-full mb-4")
                 self.folder_input.on("change", self.update_folder_path)
             ui.button(
-                "Save Settings", on_click=save_settings, color="#818b981f"
+                "Save Settings", on_click=Settings.save_settings, color="#818b981f"
             ).classes("mt-4")
         dialog.open()
 
     async def save_api_key(self):
         logger.debug("Saving API key")
-        set_setting("secrets", "REPLICATE_API_KEY", self.api_key)
-        save_settings()
+        Settings.set_setting("secrets", "REPLICATE_API_KEY", self.api_key)
+        Settings.save_settings()
         os.environ["REPLICATE_API_KEY"] = self.api_key
         self.image_generator.set_api_key(self.api_key)
 
@@ -536,8 +546,8 @@ class ImageGeneratorGUI:
                 models_json = json.dumps(
                     {"user_added": list(self.user_added_models.values())}
                 )
-                set_setting("default", "models", models_json)
-                save_settings()
+                Settings.set_setting("default", "models", models_json)
+                Settings.save_settings()
                 ui.notify(f"Model '{latest_v}' added successfully", type="positive")
                 self.model_list.refresh()
                 logger.info(f"User model added: {latest_v}")
@@ -575,8 +585,8 @@ class ImageGeneratorGUI:
             models_json = json.dumps(
                 {"user_added": list(self.user_added_models.keys())}
             )
-            set_setting("default", "models", models_json)
-            save_settings()
+            Settings.set_setting("default", "models", models_json)
+            Settings.save_settings()
             ui.notify(f"Model '{model}' deleted successfully", type="positive")
             confirm_dialog.close()
             self.model_list.refresh()
@@ -615,8 +625,8 @@ class ImageGeneratorGUI:
 
         if os.path.isdir(new_path):
             self.output_folder = new_path
-            set_setting("default", "output_folder", new_path)
-            save_settings()
+            Settings.set_setting("default", "output_folder", new_path)
+            Settings.save_settings()
             logger.info(f"Output folder set to: {self.output_folder}")
             ui.notify(
                 f"Output folder updated to: {self.output_folder}", type="positive"
@@ -656,7 +666,7 @@ class ImageGeneratorGUI:
         logger.debug("Resetting parameters to default values")
         for attr in self._attributes:
             if attr not in ["models", "replicate_model"]:
-                value = get_setting("default", attr)
+                value = Settings.get_setting("default", attr)
                 if value is not None:
                     if attr in [
                         "num_outputs",
@@ -812,11 +822,13 @@ class ImageGeneratorGUI:
             value = getattr(self, attr)
             if attr == "models":
                 value = json.dumps({"user_added": list(self.user_added_models.keys())})
-            set_setting("default", attr, str(value))
+            Settings.set_setting("default", attr, str(value))
 
-        set_setting("default", "replicate_model", self.replicate_model_select.value)
+        Settings.set_setting(
+            "default", "replicate_model", self.replicate_model_select.value
+        )
 
-        save_settings()
+        Settings.save_settings()
         logger.info("Settings saved successfully")
 
 

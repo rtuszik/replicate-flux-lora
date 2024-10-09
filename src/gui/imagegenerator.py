@@ -11,7 +11,7 @@ from gui.filehandler import FileHandler
 import httpx
 from loguru import logger
 from nicegui import ui
-from util import settings
+from util.settings import Settings
 
 DOCKERIZED = os.environ.get("DOCKER_CONTAINER", False)
 
