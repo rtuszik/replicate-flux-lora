@@ -115,16 +115,16 @@ class ImageGeneratorGUI:
             "w-full h-screen md:h-full grid-cols-1 md:grid-cols-2 gap-2 md:gap-5 p-4 md:p-6 dark:bg-[#11111b] bg-#eff1f5] md:auto-rows-min"
         ):
             with ui.card().classes("col-span-full modern-card flex-nowrap h-min"):
-                self.gui_panels.setup_top_panel(self)
+                self.gui_panels.setup_top_panel()
 
             with ui.card().classes("col-span-full modern-card"):
-                self.gui_panels.setup_prompt_panel(self)
+                self.gui_panels.setup_prompt_panel()
 
             with ui.card().classes("row-span-2 overflow-auto modern-card"):
-                self.gui_panels.setup_left_panel(self)
+                self.gui_panels.setup_left_panel()
 
             with ui.card().classes("row-span-2 overflow-auto modern-card"):
-                self.gui_panels.setup_right_panel(self)
+                self.gui_panels.setup_right_panel()
         self.custom_styles.stylefilter()
         logger.info("UI setup completed")
 
