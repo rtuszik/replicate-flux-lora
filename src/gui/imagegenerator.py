@@ -42,38 +42,64 @@ class ImageGeneratorGUI:
         ]
 
         self.user_added_models = {}
-        self.prompt = Settings.get_setting("default", "prompt", fallback="", value_type=str)
+        self.prompt = Settings.get_setting(
+            "default", "prompt", fallback="", value_type=str
+        )
 
-        self.flux_model = Settings.get_setting("default", "flux_model", fallback="dev", value_type=str)
-        self.aspect_ratio = Settings.get_setting("default", "aspect_ratio", fallback="1:1", value_type=str)
-        self.num_outputs = Settings.get_setting("default", "num_outputs", fallback=1, value_type=int)
-        self.lora_scale = Settings.get_setting("default", "lora_scale", fallback=1.0, value_type=float)
+        self.flux_model = Settings.get_setting(
+            "default", "flux_model", fallback="dev", value_type=str
+        )
+        self.aspect_ratio = Settings.get_setting(
+            "default", "aspect_ratio", fallback="1:1", value_type=str
+        )
+        self.num_outputs = Settings.get_setting(
+            "default", "num_outputs", fallback=1, value_type=int
+        )
+        self.lora_scale = Settings.get_setting(
+            "default", "lora_scale", fallback=1.0, value_type=float
+        )
         self.num_inference_steps = Settings.get_setting(
             "default", "num_inference_steps", fallback=28, value_type=int
         )
-        self.guidance_scale = Settings.get_setting("default", "guidance_scale", fallback=3.5, value_type=float)
-        self.output_format = Settings.get_setting("default", "output_format", fallback="png", value_type=str)
-        self.output_quality = Settings.get_setting("default", "output_quality", fallback=80, value_type=int)
+        self.guidance_scale = Settings.get_setting(
+            "default", "guidance_scale", fallback=3.5, value_type=float
+        )
+        self.output_format = Settings.get_setting(
+            "default", "output_format", fallback="png", value_type=str
+        )
+        self.output_quality = Settings.get_setting(
+            "default", "output_quality", fallback=80, value_type=int
+        )
         self.disable_safety_checker = Settings.get_setting(
             "default", "disable_safety_checker", fallback=True, value_type=bool
         )
 
-        self.width = Settings.get_setting("default", "width", fallback=1024, value_type=int)
-        self.height = Settings.get_setting("default", "height", fallback=1024, value_type=int)
+        self.width = Settings.get_setting(
+            "default", "width", fallback=1024, value_type=int
+        )
+        self.height = Settings.get_setting(
+            "default", "height", fallback=1024, value_type=int
+        )
         self.seed = Settings.get_setting("default", "seed", fallback=-1, value_type=int)
 
         self.output_folder = (
             "/app/output"
             if DOCKERIZED
-            else Settings.get_setting("default", "output_folder", fallback="/Downloads", value_type=str)
+            else Settings.get_setting(
+                "default", "output_folder", fallback="/Downloads", value_type=str
+            )
         )
-        models_json = Settings.get_setting("default", "models", fallback='{"user_added": []}', value_type=str)
+        models_json = Settings.get_setting(
+            "default", "models", fallback='{"user_added": []}', value_type=str
+        )
         models = json.loads(models_json)
         self.user_added_models = {
             model: model for model in models.get("user_added", [])
         }
         self.model_options = list(self.user_added_models.keys())
-        self.replicate_model = Settings.get_setting("default", "replicate_model", fallback="", value_type=str)
+        self.replicate_model = Settings.get_setting(
+            "default", "replicate_model", fallback="", value_type=str
+        )
 
         logger.info("ImageGeneratorGUI initialized")
 
