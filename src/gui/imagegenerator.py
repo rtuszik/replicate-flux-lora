@@ -8,6 +8,7 @@ from gui.lightbox import Lightbox
 from gui.styles import Styles
 from gui.panels import GUIPanels
 from gui.filehandler import FileHandler
+from typing import Any
 import httpx
 from loguru import logger
 from nicegui import ui
@@ -22,7 +23,9 @@ class ImageGeneratorGUI:
         self.image_generator = image_generator
         self.api_key = Settings.get_api_key() or os.environ.get("REPLICATE_API_KEY", "")
         self.last_generated_images = []
-        self.custom_styles = Styles.setup_custom_styles()
+        self.custom_styles = Styles()
+        self.custom_styles.setup_custom_styles()
+        self.gui_panels = GUIPanels()
         self._attributes = [
             "prompt",
             "flux_model",
@@ -112,17 +115,17 @@ class ImageGeneratorGUI:
             "w-full h-screen md:h-full grid-cols-1 md:grid-cols-2 gap-2 md:gap-5 p-4 md:p-6 dark:bg-[#11111b] bg-#eff1f5] md:auto-rows-min"
         ):
             with ui.card().classes("col-span-full modern-card flex-nowrap h-min"):
-                GUIPanels.setup_top_panel(self)
+                self.gui_panels.setup_top_panel(self)
 
             with ui.card().classes("col-span-full modern-card"):
-                GUIPanels.setup_prompt_panel(self)
+                self.gui_panels.setup_prompt_panel(self)
 
             with ui.card().classes("row-span-2 overflow-auto modern-card"):
-                GUIPanels.setup_left_panel(self)
+                self.gui_panels.setup_left_panel(self)
 
             with ui.card().classes("row-span-2 overflow-auto modern-card"):
-                GUIPanels.setup_right_panel(self)
-        Styles.stylefilter(self)
+                self.gui_panels.setup_right_panel(self)
+        self.custom_styles.stylefilter()
         logger.info("UI setup completed")
 
     async def open_settings_popup(self):
@@ -201,14 +204,14 @@ class ImageGeneratorGUI:
             if hasattr(self, "folder_input"):
                 self.folder_input.value = self.output_folder
 
-    async def toggle_custom_dimensions(self, e):
+    async def toggle_custom_dimensions(self, e: Any):
         logger.debug(f"Toggling custom dimensions: {e.value}")
         if e.value == "custom":
-            self.width_input.enable()
-            self.height_input.enable()
+            self.gui_panels.width_input.enable()
+            self.gui_panels.height_input.enable()
         else:
-            self.width_input.disable()
-            self.height_input.disable()
+            self.gui_panels.width_input.disable()
+            self.gui_panels.height_input.disable()
         await self.save_settings()
         logger.info(f"Custom dimensions toggled: {e.value}")
 
@@ -264,7 +267,7 @@ class ImageGeneratorGUI:
             )
             logger.error("Cannot start generation: No API key set.")
             return
-        if not self.replicate_model_select.value:
+        if not self.gui_panels.replicate_model_select.value:
             ui.notify(
                 "Please select a Replicate model before generating images.",
                 type="negative",
@@ -275,12 +278,12 @@ class ImageGeneratorGUI:
             return
 
         await asyncio.to_thread(
-            self.image_generator.set_model, self.replicate_model_select.value
+            self.image_generator.set_model, self.gui_panels.replicate_model_select.value
         )
 
         await self.save_settings()
         params = {
-            "prompt": self.prompt_input.value,
+            "prompt": self.gui_panels.prompt_input.value,
             "flux_model": self.flux_model,
             "aspect_ratio": self.aspect_ratio,
             "num_outputs": self.num_outputs,
@@ -299,8 +302,8 @@ class ImageGeneratorGUI:
         if self.seed != -1:
             params["seed"] = self.seed
 
-        self.generate_button.disable()
-        self.progress.visible = True
+        self.gui_panels.generate_button.disable()
+        self.gui_panels.progress.visible = True
         ui.notify("Generating images...", type="info")
         logger.info(f"Generating images with params: {json.dumps(params, indent=2)}")
 
@@ -315,8 +318,8 @@ class ImageGeneratorGUI:
             ui.notify(error_message, type="negative")
             logger.exception(error_message)
         finally:
-            self.generate_button.enable()
-            self.progress.visible = False
+            self.gui_panels.generate_button.enable()
+            self.gui_panels.progress.visible = False
 
     # def create_zip_file(self):
     #     logger.debug("Creating zip file of generated images")
@@ -344,13 +347,13 @@ class ImageGeneratorGUI:
     #
     async def update_gallery(self, image_paths):
         logger.debug("Updating image gallery")
-        self.gallery_container.clear()
+        self.gui_panels.gallery_container.clear()
         self.last_generated_images = image_paths
-        with self.gallery_container:
+        with self.gui_panels.gallery_container:
             with ui.row().classes("w-full"):
                 with ui.grid(columns=2).classes("md:grid-cols-3 w-full gap-2"):
                     for image_path in image_paths:
-                        self.lightbox.add_image(
+                        self.gui_panels.lightbox.add_image(
                             image_path, image_path, "w-full h-full object-cover"
                         )
         logger.debug("Image gallery updated")
@@ -387,7 +390,7 @@ class ImageGeneratorGUI:
             Settings.set_setting("default", attr, str(value))
 
         Settings.set_setting(
-            "default", "replicate_model", self.replicate_model_select.value
+            "default", "replicate_model", self.gui_panels.replicate_model_select.value
         )
 
         Settings.save_settings()
