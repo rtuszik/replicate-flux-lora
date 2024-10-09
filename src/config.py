@@ -38,11 +38,11 @@ def get_setting(
     try:
         value = config.get(section, key)
         logger.debug(f"Raw value retrieved: {value}")
-        if value_type == int:
+        if isinstance(value_type, type) and issubclass(value_type, int):
             result = int(value)
-        elif value_type == float:
+        elif isinstance(value_type, type) and issubclass(value_type, float):
             result = float(value)
-        elif value_type == bool:
+        elif isinstance(value_type, type) and issubclass(value_type, bool):
             result = value.lower() in ("true", "yes", "1", "on")
         else:
             result = value
