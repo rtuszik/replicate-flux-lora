@@ -19,6 +19,7 @@ logger.info("Configuration files loaded")
 
 
 class Settings:
+    @staticmethod
     def get_api_key():
         api_key = os.environ.get("REPLICATE_API_KEY") or config.get(
             "secrets", "REPLICATE_API_KEY", fallback=None
@@ -29,6 +30,7 @@ class Settings:
             logger.warning("No API key found")
         return api_key
 
+    @staticmethod
     def get_setting(
         section: str, key: str, fallback: Any = None, value_type: Type[Any] = str
     ) -> Any:
@@ -59,7 +61,8 @@ class Settings:
             )
             return fallback
 
-    def set_setting(section, key, value):
+    @staticmethod
+    def set_setting(section: str, key: str, value: Any):
         logger.info(f"Setting value: section={section}, key={key}, value={value}")
         if not config.has_section(section):
             logger.info(f"Creating new section: {section}")
@@ -67,6 +70,7 @@ class Settings:
         config.set(section, key, str(value))
         logger.info("Value set successfully")
 
+    @staticmethod
     def save_settings():
         logger.info(f"Saving settings to {USER_CONFIG_FILE}")
         try:
