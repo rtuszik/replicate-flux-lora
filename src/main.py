@@ -5,12 +5,13 @@ from pathlib import Path
 src_path = Path(__file__).parent
 sys.path.insert(0, str(src_path))
 
-from loguru import logger
-from nicegui import ui
+# Local imports after path modification
+from loguru import logger  # noqa: E402
+from nicegui import ui  # noqa: E402
 
-from gui.imagegenerator import ImageGeneratorGUI
-from util.replicate_api import Replicate_API
-from util.settings import Settings
+from gui.imagegenerator import ImageGeneratorGUI  # noqa: E402
+from util.replicate_api import Replicate_API  # noqa: E402
+from util.settings import Settings  # noqa: E402
 
 logger.add(
     sys.stderr, format="{time} {level} {message}", filter="my_module", level="INFO"
