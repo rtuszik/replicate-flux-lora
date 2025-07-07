@@ -4,7 +4,7 @@ import json
 from loguru import logger
 from nicegui import ui
 
-from util import Settings
+from util.settings import Settings
 
 
 class UserModels:

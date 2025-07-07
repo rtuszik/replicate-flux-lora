@@ -12,7 +12,7 @@ from nicegui import ui
 from gui.panels import GUIPanels
 from gui.styles import Styles
 from gui.usermodels import UserModels
-from util import Settings
+from util.settings import Settings
 
 DOCKERIZED = os.environ.get("DOCKER_CONTAINER", False)
 

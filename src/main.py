@@ -1,9 +1,16 @@
 import sys
+from pathlib import Path
+
+# Add src directory to Python path for absolute imports
+src_path = Path(__file__).parent
+sys.path.insert(0, str(src_path))
 
 from loguru import logger
 from nicegui import ui
-import util
-from gui import ImageGeneratorGUI
+
+from gui.imagegenerator import ImageGeneratorGUI
+from util.replicate_api import Replicate_API
+from util.settings import Settings
 
 logger.add(
     sys.stderr, format="{time} {level} {message}", filter="my_module", level="INFO"
@@ -18,9 +25,9 @@ logger.add(
 
 
 logger.info("Initializing ImageGenerator")
-generator = util.Replicate_API()
+generator = Replicate_API()
 
-api_key = util.Settings.get_api_key()
+api_key = Settings.get_api_key()
 if api_key:
     generator.set_api_key(api_key)
 else:
