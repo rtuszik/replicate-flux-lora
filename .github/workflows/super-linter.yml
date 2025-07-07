@@ -29,7 +29,6 @@ jobs:
                   VALIDATE_ALL_CODEBASE: true
                   FIX_PYTHON_RUFF: true
                   VALIDATE_PYTHON_RUFF: true
-                  VALIDATE_MARKDOWN_PRETTIER: false
                   VALIDATE_GITLEAKS: true
                   VALIDATE_GITHUB_ACTIONS: true
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
