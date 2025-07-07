@@ -130,16 +130,6 @@ For local development, you can run the application directly with Python. The pro
 In order to fine-tune you own model, please check out Replicate's guide on fine-tuning Flux:
 <https://replicate.com/blog/fine-tune-flux>
 
-## Roadmap
-
-- [ ] Option to Store Metadata to Images
-- [ ] Option for Automatic Downloads through Browser
-- [ ] Running Base Flux.1 Models
-- [ ] Run Models with File Input
-- [ ] Cancel Generations
-- [ ] Batch Image Generation
-- [ ] Image-to-Image Workflows
-
 ## API Key Setup
 
 To use this application, you need a Replicate API key. Follow these steps to set it up:
