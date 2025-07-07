@@ -359,12 +359,43 @@ class ImageGeneratorGUI(GUIPanels, UserModels):
         logger.debug("Downloading and displaying generated images")
         downloaded_images = []
         
-        for i, output in enumerate(image_outputs):
+        outputs_to_process = []
+        
+        if isinstance(image_outputs, list):
+            outputs_to_process = image_outputs
+        elif hasattr(image_outputs, 'read') and hasattr(image_outputs, '__iter__'):
+            try:
+                iterator_content = []
+                for content in image_outputs:
+                    if isinstance(content, bytes):
+                        iterator_content.append(content)
+                    else:
+                        break
+                
+                if iterator_content:
+                    logger.debug(f"Processing {len(iterator_content)} images from FileOutput iterator")
+                    for i, file_content in enumerate(iterator_content):
+                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                        url_part = urllib.parse.urlparse(image_outputs.url).path.split("/")[-2][:8] if hasattr(image_outputs, 'url') else "unknown"
+                        file_name = f"generated_image_{timestamp}_{url_part}_{i+1}.png"
+                        file_path = Path(self.output_folder) / file_name
+                        with open(file_path, "wb") as f:
+                            f.write(file_content)
+                        downloaded_images.append(str(file_path))
+                        logger.info(f"Image downloaded: {file_path}")
+                else:
+                    # Single FileOutput
+                    outputs_to_process = [image_outputs]
+            except Exception as e:
+                logger.debug(f"Iterator processing failed, treating as single FileOutput: {e}")
+                outputs_to_process = [image_outputs]
+        else:
+            outputs_to_process = [image_outputs]
+        
+        for i, output in enumerate(outputs_to_process):
             try:
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                # Handle both FileObject (v1.0+) and URL string (legacy) formats
                 if hasattr(output, 'read'):
-                    # New FileObject format
                     logger.debug(f"Processing FileObject from {output.url}")
                     file_content = await asyncio.to_thread(output.read)
                     url_part = urllib.parse.urlparse(output.url).path.split("/")[-2][:8]
@@ -380,7 +411,8 @@ class ImageGeneratorGUI(GUIPanels, UserModels):
                             logger.error(f"Failed to download image from {output}")
                             continue
                 
-                file_name = f"generated_image_{timestamp}_{url_part}_{i+1}.png"
+                base_index = len(downloaded_images)
+                file_name = f"generated_image_{timestamp}_{url_part}_{base_index + i + 1}.png"
                 file_path = Path(self.output_folder) / file_name
                 with open(file_path, "wb") as f:
                     f.write(file_content)
