@@ -1,7 +1,9 @@
-from nicegui import ui
-from loguru import logger
 import asyncio
 import json
+
+from loguru import logger
+from nicegui import ui
+
 from util import Settings
 
 
@@ -51,7 +53,7 @@ class UserModels:
                     {"user_added": list(self.user_added_models.values())}
                 )
                 Settings.set_setting("default", "models", models_json)
-                save_settings()
+                await self.save_settings()
                 ui.notify(f"Model '{latest_v}' added successfully", type="positive")
                 self.model_list.refresh()
                 logger.info(f"User model added: {latest_v}")
@@ -90,7 +92,7 @@ class UserModels:
                 {"user_added": list(self.user_added_models.keys())}
             )
             Settings.set_setting("default", "models", models_json)
-            save_settings()
+            await self.save_settings()
             ui.notify(f"Model '{model}' deleted successfully", type="positive")
             confirm_dialog.close()
             self.model_list.refresh()
@@ -102,10 +104,12 @@ class UserModels:
     async def update_replicate_model(self, new_model):
         logger.debug(f"Updating Replicate model to: {new_model}")
         if new_model:
-            await asyncio.to_thread(self.image_generator.set_model, new_model)
+            # Get the full model name with version from the selected key
+            full_model_name = self.user_added_models.get(new_model, new_model)
+            await asyncio.to_thread(self.image_generator.set_model, full_model_name)
             self.replicate_model = new_model
             await self.save_settings()
-            logger.info(f"Replicate model updated to: {new_model}")
+            logger.info(f"Replicate model updated to: {full_model_name}")
             self.generate_button.enable()
         else:
             logger.warning("No Replicate model selected")

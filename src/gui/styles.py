@@ -1,5 +1,5 @@
-from nicegui import ui, ElementFilter
 from loguru import logger
+from nicegui import ElementFilter, ui
 
 
 class Styles:

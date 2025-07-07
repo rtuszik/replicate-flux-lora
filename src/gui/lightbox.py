@@ -1,5 +1,5 @@
-from nicegui import ui
 from loguru import logger
+from nicegui import ui
 
 
 class Lightbox:

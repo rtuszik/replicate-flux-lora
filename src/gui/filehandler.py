@@ -1,8 +1,9 @@
-from nicegui import ui
-from datetime import datetime
 import zipfile
-from loguru import logger
+from datetime import datetime
 from pathlib import Path
+
+from loguru import logger
+from nicegui import ui
 
 
 class FileHandler:

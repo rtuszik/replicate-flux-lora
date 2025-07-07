@@ -4,19 +4,20 @@ import os
 import urllib.parse
 from datetime import datetime
 from pathlib import Path
-from gui.lightbox import Lightbox
-from gui.styles import Styles
-from gui.panels import GUIPanels
-from gui.filehandler import FileHandler
+
 import httpx
 from loguru import logger
 from nicegui import ui
+
+from gui.panels import GUIPanels
+from gui.styles import Styles
+from gui.usermodels import UserModels
 from util import Settings
 
 DOCKERIZED = os.environ.get("DOCKER_CONTAINER", False)
 
 
-class ImageGeneratorGUI:
+class ImageGeneratorGUI(GUIPanels, UserModels):
     def __init__(self, image_generator):
         logger.info("Initializing ImageGeneratorGUI")
         self.image_generator = image_generator
@@ -46,25 +47,25 @@ class ImageGeneratorGUI:
 
         self.flux_model = Settings.get_setting("default", "flux_model", "dev", str)
         self.aspect_ratio = Settings.get_setting("default", "aspect_ratio", "1:1", str)
-        self.num_outputs = Settings.get_setting("default", "num_outputs", "1", int)
-        self.lora_scale = Settings.get_setting("default", "lora_scale", "1", float)
+        self.num_outputs = Settings.get_setting("default", "num_outputs", 1, int)
+        self.lora_scale = Settings.get_setting("default", "lora_scale", 1.0, float)
         self.num_inference_steps = Settings.get_setting(
             "default", "num_inference_steps", "28", int
         )
         self.guidance_scale = Settings.get_setting(
-            "default", "guidance_scale", "3.5", float
+            "default", "guidance_scale", 3.5, float
         )
         self.output_format = Settings.get_setting("default", "output_format", "png")
         self.output_quality = Settings.get_setting(
-            "default", "output_quality", "80", int
+            "default", "output_quality", 80, int
         )
         self.disable_safety_checker = Settings.get_setting(
             "default", "disable_safety_checker", True, bool
         )
 
-        self.width = Settings.get_setting("default", "width", "1024", int)
-        self.height = Settings.get_setting("default", "height", "1024", int)
-        self.seed = Settings.get_setting("default", "seed", "-1", int)
+        self.width = Settings.get_setting("default", "width", 1024, int)
+        self.height = Settings.get_setting("default", "height", 1024, int)
+        self.seed = Settings.get_setting("default", "seed", -1, int)
 
         self.output_folder = (
             "/app/output"
@@ -75,9 +76,22 @@ class ImageGeneratorGUI:
             "default", "models", '{"user_added": []}', str
         )
         models = json.loads(models_json)
-        self.user_added_models = {
-            model: model for model in models.get("user_added", [])
-        }
+        user_added = models.get("user_added", [])
+        
+        # Handle both list and dict formats for backward compatibility
+        if isinstance(user_added, dict):
+            # If it's a dict, use the values (full model names with versions)
+            self.user_added_models = {
+                key: value for key, value in user_added.items()
+            }
+        elif isinstance(user_added, list):
+            # If it's a list, create dict mapping model names to themselves
+            self.user_added_models = {
+                model: model for model in user_added
+            }
+        else:
+            # Fallback to empty dict
+            self.user_added_models = {}
         self.model_options = list(self.user_added_models.keys())
         self.replicate_model = Settings.get_setting(
             "default", "replicate_model", "", str
@@ -94,16 +108,16 @@ class ImageGeneratorGUI:
             "w-full h-screen md:h-full grid-cols-1 md:grid-cols-2 gap-2 md:gap-5 p-4 md:p-6 dark:bg-[#11111b] bg-#eff1f5] md:auto-rows-min"
         ):
             with ui.card().classes("col-span-full modern-card flex-nowrap h-min"):
-                GUIPanels.setup_top_panel(self)
+                self.setup_top_panel()
 
             with ui.card().classes("col-span-full modern-card"):
-                GUIPanels.setup_prompt_panel(self)
+                self.setup_prompt_panel()
 
             with ui.card().classes("row-span-2 overflow-auto modern-card"):
-                GUIPanels.setup_left_panel(self)
+                self.setup_left_panel()
 
             with ui.card().classes("row-span-2 overflow-auto modern-card"):
-                GUIPanels.setup_right_panel(self)
+                self.setup_right_panel()
         Styles.stylefilter(self)
         logger.info("UI setup completed")
 
@@ -126,7 +140,7 @@ class ImageGeneratorGUI:
                 if new_api_key != self.api_key:
                     self.api_key = new_api_key
                     Settings.set_setting("secrets", "REPLICATE_API_KEY", new_api_key)
-                    await self.save_settings()
+                    Settings.save_settings()
                     os.environ["REPLICATE_API_KEY"] = new_api_key
                     self.image_generator.set_api_key(new_api_key)
                     logger.info("API key saved")
@@ -256,8 +270,12 @@ class ImageGeneratorGUI:
             )
             return
 
+        # Get the full model name with version from the selected key
+        selected_model_key = self.replicate_model_select.value
+        full_model_name = self.user_added_models.get(selected_model_key, selected_model_key)
+        
         await asyncio.to_thread(
-            self.image_generator.set_model, self.replicate_model_select.value
+            self.image_generator.set_model, full_model_name
         )
 
         await self.save_settings()
@@ -337,24 +355,40 @@ class ImageGeneratorGUI:
                         )
         logger.debug("Image gallery updated")
 
-    async def download_and_display_images(self, image_urls):
+    async def download_and_display_images(self, image_outputs):
         logger.debug("Downloading and displaying generated images")
         downloaded_images = []
-        async with httpx.AsyncClient() as client:
-            for i, url in enumerate(image_urls):
-                logger.debug(f"Downloading image from {url}")
-                response = await client.get(url)
-                if response.status_code == 200:
-                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                    url_part = urllib.parse.urlparse(url).path.split("/")[-2][:8]
-                    file_name = f"generated_image_{timestamp}_{url_part}_{i+1}.png"
-                    file_path = Path(self.output_folder) / file_name
-                    with open(file_path, "wb") as f:
-                        f.write(response.content)
-                    downloaded_images.append(str(file_path))
-                    logger.info(f"Image downloaded: {file_path}")
+        
+        for i, output in enumerate(image_outputs):
+            try:
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                # Handle both FileObject (v1.0+) and URL string (legacy) formats
+                if hasattr(output, 'read'):
+                    # New FileObject format
+                    logger.debug(f"Processing FileObject from {output.url}")
+                    file_content = await asyncio.to_thread(output.read)
+                    url_part = urllib.parse.urlparse(output.url).path.split("/")[-2][:8]
                 else:
-                    logger.error(f"Failed to download image from {url}")
+                    # Legacy URL string format
+                    logger.debug(f"Processing URL string: {output}")
+                    async with httpx.AsyncClient() as client:
+                        response = await client.get(output)
+                        if response.status_code == 200:
+                            file_content = response.content
+                            url_part = urllib.parse.urlparse(output).path.split("/")[-2][:8]
+                        else:
+                            logger.error(f"Failed to download image from {output}")
+                            continue
+                
+                file_name = f"generated_image_{timestamp}_{url_part}_{i+1}.png"
+                file_path = Path(self.output_folder) / file_name
+                with open(file_path, "wb") as f:
+                    f.write(file_content)
+                downloaded_images.append(str(file_path))
+                logger.info(f"Image downloaded: {file_path}")
+                
+            except Exception as e:
+                logger.error(f"Error processing image {i}: {str(e)}")
 
         await self.update_gallery(downloaded_images)
         ui.notify("Images generated and downloaded successfully!", type="positive")

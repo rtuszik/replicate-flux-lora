@@ -1,11 +1,11 @@
 import asyncio
-from nicegui import ui
+
 from loguru import logger
-from util.settings import Settings
-from gui.lightbox import Lightbox
-from gui.usermodels import UserModels
+from nicegui import ui
+
 from gui.filehandler import FileHandler
-from gui.styles import Styles
+from gui.lightbox import Lightbox
+from util.settings import Settings
 
 
 class GUIPanels:
@@ -42,7 +42,7 @@ class GUIPanels:
                 .props("filled bg-color=dark")
             )
             ui.button(icon="token", color="blue-4").classes("ml-2 mt-1.2").on(
-                "click", UserModels.open_user_model_popup(self)
+                "click", self.open_user_model_popup
             ).props("size=1.3rem")
 
         self.flux_model_select = (
