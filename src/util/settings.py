@@ -19,21 +19,23 @@ logger.info("Configuration files loaded")
 
 
 class Settings:
+    @staticmethod
     def get_api_key():
         api_key = os.environ.get("REPLICATE_API_KEY") or config.get(
             "secrets", "REPLICATE_API_KEY", fallback=None
         )
         if api_key:
-            logger.info("API key retrieved successfully")
+            logger.debug("API key retrieved successfully")
         else:
             logger.warning("No API key found")
         return api_key
 
+    @staticmethod
     def get_setting(
         section: str, key: str, fallback: Any = None, value_type: Type[Any] = str
     ) -> Any:
-        logger.info(
-            f"Attempting to get setting: section={section}, key={key}, fallback={fallback}, value_type={value_type}"
+        logger.debug(
+            f"Getting setting: section={section}, key={key}, fallback={fallback}, value_type={value_type}"
         )
         try:
             value = config.get(section, key)
@@ -46,27 +48,29 @@ class Settings:
                 result = value.lower() in ("true", "yes", "1", "on")
             else:
                 result = value
-            logger.info(f"Setting retrieved successfully: {result}")
+            logger.debug(f"Setting retrieved successfully: {result}")
             return result
         except (configparser.NoSectionError, configparser.NoOptionError) as e:
-            logger.warning(
+            logger.debug(
                 f"Setting not found: {str(e)}. Using fallback value: {fallback}"
             )
             return fallback
         except ValueError as e:
-            logger.error(
+            logger.warning(
                 f"Error converting setting value: {str(e)}. Using fallback value: {fallback}"
             )
             return fallback
 
+    @staticmethod
     def set_setting(section, key, value):
-        logger.info(f"Setting value: section={section}, key={key}, value={value}")
+        logger.debug(f"Setting value: section={section}, key={key}, value={value}")
         if not config.has_section(section):
-            logger.info(f"Creating new section: {section}")
+            logger.debug(f"Creating new section: {section}")
             config.add_section(section)
         config.set(section, key, str(value))
-        logger.info("Value set successfully")
+        logger.debug("Value set successfully")
 
+    @staticmethod
     def save_settings():
         logger.info(f"Saving settings to {USER_CONFIG_FILE}")
         try:

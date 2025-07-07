@@ -2,6 +2,7 @@ import asyncio
 import json
 import os
 import urllib.parse
+import uuid
 from datetime import datetime
 from pathlib import Path
 
@@ -23,7 +24,6 @@ class ImageGeneratorGUI(GUIPanels, UserModels):
         self.image_generator = image_generator
         self.api_key = Settings.get_api_key() or os.environ.get("REPLICATE_API_KEY", "")
         self.last_generated_images = []
-        self.custom_styles = Styles.setup_custom_styles()
         self._attributes = [
             "prompt",
             "flux_model",
@@ -43,29 +43,27 @@ class ImageGeneratorGUI(GUIPanels, UserModels):
         ]
 
         self.user_added_models = {}
-        self.prompt = Settings.get_setting("default", "prompt", "", str)
-
-        self.flux_model = Settings.get_setting("default", "flux_model", "dev", str)
-        self.aspect_ratio = Settings.get_setting("default", "aspect_ratio", "1:1", str)
-        self.num_outputs = Settings.get_setting("default", "num_outputs", 1, int)
-        self.lora_scale = Settings.get_setting("default", "lora_scale", 1.0, float)
-        self.num_inference_steps = Settings.get_setting(
-            "default", "num_inference_steps", "28", int
-        )
-        self.guidance_scale = Settings.get_setting(
-            "default", "guidance_scale", 3.5, float
-        )
-        self.output_format = Settings.get_setting("default", "output_format", "png")
-        self.output_quality = Settings.get_setting(
-            "default", "output_quality", 80, int
-        )
-        self.disable_safety_checker = Settings.get_setting(
-            "default", "disable_safety_checker", True, bool
-        )
-
-        self.width = Settings.get_setting("default", "width", 1024, int)
-        self.height = Settings.get_setting("default", "height", 1024, int)
-        self.seed = Settings.get_setting("default", "seed", -1, int)
+        
+        # Configuration mapping for settings
+        config_mapping = {
+            "prompt": ("", str),
+            "flux_model": ("dev", str),
+            "aspect_ratio": ("1:1", str),
+            "num_outputs": (1, int),
+            "lora_scale": (1.0, float),
+            "num_inference_steps": (28, int),
+            "guidance_scale": (3.5, float),
+            "output_format": ("png", str),
+            "output_quality": (80, int),
+            "disable_safety_checker": (True, bool),
+            "width": (1024, int),
+            "height": (1024, int),
+            "seed": (-1, int),
+        }
+        
+        # Apply all settings using the mapping
+        for attr, (default_value, value_type) in config_mapping.items():
+            setattr(self, attr, Settings.get_setting("default", attr, default_value, value_type))
 
         self.output_folder = (
             "/app/output"
@@ -101,6 +99,7 @@ class ImageGeneratorGUI(GUIPanels, UserModels):
 
     def setup_ui(self):
         logger.info("Setting up UI")
+        Styles.setup_custom_styles()
         ui.dark_mode(True)
         self.check_api_key()
 
@@ -376,8 +375,9 @@ class ImageGeneratorGUI(GUIPanels, UserModels):
                     logger.debug(f"Processing {len(iterator_content)} images from FileOutput iterator")
                     for i, file_content in enumerate(iterator_content):
                         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                        unique_id = str(uuid.uuid4())[:8]
                         url_part = urllib.parse.urlparse(image_outputs.url).path.split("/")[-2][:8] if hasattr(image_outputs, 'url') else "unknown"
-                        file_name = f"generated_image_{timestamp}_{url_part}_{i+1}.png"
+                        file_name = f"generated_image_{timestamp}_{url_part}_{unique_id}_{i+1}.png"
                         file_path = Path(self.output_folder) / file_name
                         with open(file_path, "wb") as f:
                             f.write(file_content)
@@ -395,6 +395,7 @@ class ImageGeneratorGUI(GUIPanels, UserModels):
         for i, output in enumerate(outputs_to_process):
             try:
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                unique_id = str(uuid.uuid4())[:8]
                 if hasattr(output, 'read'):
                     logger.debug(f"Processing FileObject from {output.url}")
                     file_content = await asyncio.to_thread(output.read)
@@ -412,7 +413,7 @@ class ImageGeneratorGUI(GUIPanels, UserModels):
                             continue
                 
                 base_index = len(downloaded_images)
-                file_name = f"generated_image_{timestamp}_{url_part}_{base_index + i + 1}.png"
+                file_name = f"generated_image_{timestamp}_{url_part}_{unique_id}_{base_index + i + 1}.png"
                 file_path = Path(self.output_folder) / file_name
                 with open(file_path, "wb") as f:
                     f.write(file_content)

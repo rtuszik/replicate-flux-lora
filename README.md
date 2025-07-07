@@ -50,7 +50,13 @@ Docker is the recommended way to run this application. Follow these steps to get
         replicate-flux-lora-settings:
     ```
 
-4. Replace `/path/to/your/output/directory` with the actual path where you want to save the generated images on your host machine.
+4. Set the `HOST_OUTPUT_DIR` environment variable to the directory where you want to save generated images:
+
+    ```bash
+    export HOST_OUTPUT_DIR=/path/to/your/output/directory
+    ```
+
+    Replace `/path/to/your/output/directory` with the actual path on your host machine.
 
 5. Run the application using Docker Compose:
 

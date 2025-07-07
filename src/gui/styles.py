@@ -3,6 +3,7 @@ from nicegui import ElementFilter, ui
 
 
 class Styles:
+    @staticmethod
     def setup_custom_styles():
         logger.debug("Setting up custom styles")
         ui.add_head_html("""

@@ -45,10 +45,10 @@ class UserModels:
                     self.image_generator.get_model_version, new_model
                 )
                 self.user_added_models[new_model] = latest_v
-                self.model_options = list(self.user_added_models.values())
+                self.model_options = list(self.user_added_models.keys())
                 self.replicate_model_select.options = self.model_options
-                self.replicate_model_select.value = latest_v
-                await self.update_replicate_model(latest_v)
+                self.replicate_model_select.value = new_model
+                await self.update_replicate_model(new_model)
                 models_json = json.dumps(
                     {"user_added": list(self.user_added_models.values())}
                 )
