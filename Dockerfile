@@ -1,23 +1,23 @@
-FROM python:3.12-slim
+# FROM python:3.12-slim
+FROM ghcr.io/astral-sh/uv:python3.13-bookworm-slim
 
-# Environment variables to optimize Python behavior
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV DOCKER_CONTAINER=True
 
-# Set the working directory
 WORKDIR /app
 
-# Copy the requirements file and install dependencies
-COPY requirements.txt .
-RUN python -m pip install -r requirements.txt
+RUN --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,source=uv.lock,target=uv.lock \
+    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    uv sync --locked --no-install-project
 
-# Copy the application source code to the working directory
 COPY src/ .
 COPY settings.ini .
 
-# Expose the desired port
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --locked
+
 EXPOSE 8080
 
-# Define the command to run your application
-CMD ["python", "main.py"]
+CMD ["uv", "run", "main.py"]
