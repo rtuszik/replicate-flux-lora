@@ -1,16 +1,16 @@
 [project]
 name = "replicate-flux-lora"
-version = "2.0.0"
+version = "1.3.1"
 description = "WebUI for running Flux LoRAs using the Replicate API."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "dynaconf==3.2.6",
-    "httpx==0.27.2",
-    "loguru==0.7.2",
-    "nicegui==2.3.0",
-    "python-dotenv==1.0.1",
-    "replicate==1.0.7",
-    "token-count==0.2.1",
-    "toml==0.10.2",
+    "dynaconf",
+    "httpx",
+    "loguru",
+    "nicegui",
+    "python-dotenv",
+    "replicate",
+    "token-count",
+    "toml",
 ]
