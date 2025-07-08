@@ -12,7 +12,7 @@ class GUIPanels:
     def setup_top_panel(self):
         logger.debug("Setting up top panel")
         with ui.row().classes("w-full items-center"):
-            ui.label("Lumberjack - Replicate API Interface").classes(
+            ui.label("Replicate API Interface").classes(
                 "text-2xl/loose font-bold"
             )
             # dark_mode = ui.dark_mode(True)
