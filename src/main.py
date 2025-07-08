@@ -1,10 +1,17 @@
 import sys
+from pathlib import Path
 
-from config import get_api_key
-from gui import create_gui
-from loguru import logger
-from nicegui import ui
-from replicate_api import ImageGenerator
+# Add src directory to Python path for absolute imports
+src_path = Path(__file__).parent
+sys.path.insert(0, str(src_path))
+
+# Local imports after path modification
+from loguru import logger  # noqa: E402
+from nicegui import ui  # noqa: E402
+
+from gui.imagegenerator import ImageGeneratorGUI  # noqa: E402
+from util.replicate_api import Replicate_API  # noqa: E402
+from util.settings import Settings  # noqa: E402
 
 logger.add(
     sys.stderr, format="{time} {level} {message}", filter="my_module", level="INFO"
@@ -12,17 +19,16 @@ logger.add(
 logger.add(
     "app.log",
     format="{time} {level} {module}:{line} {message}",
-    level="DEBUG",
+    level="INFO",
     rotation="500 MB",
     compression="zip",
 )
 
 
 logger.info("Initializing ImageGenerator")
-generator = ImageGenerator()
+generator = Replicate_API()
 
-
-api_key = get_api_key()
+api_key = Settings.get_api_key()
 if api_key:
     generator.set_api_key(api_key)
 else:
@@ -33,8 +39,15 @@ logger.info("Creating and setting up GUI")
 
 @ui.page("/")
 async def main_page():
-    await create_gui(generator)
-    logger.info("NiceGUI server is running")
+    try:
+        logger.debug("Creating GUI")
+        gui = ImageGeneratorGUI(generator)
+        gui.setup_ui()
+        logger.debug("GUI created")
+    except Exception as e:
+        logger.exception(f"Error creating GUI: {e}")
+        ui.label(f"Error loading GUI: {e}")
+        raise
 
 
 logger.info("Starting NiceGUI server")

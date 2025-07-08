@@ -8,18 +8,24 @@
 
 ![Application Screenshot](assets/main-page.png)
 
-A powerful and user-friendly GUI application for generating images using the Replicate API and Flux LoRA models. This tool provides an intuitive interface for controlling various parameters of image generation, making it accessible for both beginners and advanced users.
+A powerful and user-friendly GUI application for generating images using the Replicate API and Flux LoRA models. Built with NiceGUI, this tool provides an intuitive interface for controlling various parameters of image generation, making it accessible for both beginners and advanced users.
 
 ## Features
 
-- 🖼️ Generate Images Using The Replicate Api And Custom Flux Lora Models
-- 💾 Save Generated Images To A Specified Output Folder Or Through Your Browser
-- 🖥️ User-Friendly Gui
-- 🐳 Docker Support For Easy Deployment
-- 📊 Store Multiple Replicate Models For Quick Switching
-- 🔄 Asynchronous Image Generation And Download
+- 🖼️ **Image Generation**: Generate images using the Replicate API and custom Flux LoRA models
+- 💾 **Flexible Output**: Save generated images to a specified output folder or download through your browser
+- 🖥️ **Modern GUI**: Clean, responsive web interface built with NiceGUI and dark mode support
+- 🐳 **Docker Support**: Easy deployment with Docker and Docker Compose
+- 📊 **Model Management**: Store and quickly switch between multiple Replicate models
+- 🔄 **Async Processing**: Asynchronous image generation and download for better performance
+- ⚙️ **Advanced Parameters**: Fine-tune generation with aspect ratio, inference steps, guidance scale, and more
+- 🔧 **Robust Architecture**: Modular codebase with proper error handling and logging
+- 📦 **Modern Dependency Management**: Support for both pip/venv and uv package manager
+- 🔍 **Code Quality**: Linted with Ruff and follows Python best practices
 
 ## Installation
+
+### Docker (Recommended)
 
 Docker is the recommended way to run this application. Follow these steps to get started:
 
@@ -29,30 +35,91 @@ Docker is the recommended way to run this application. Follow these steps to get
 
 3. Create a `docker-compose.yml` file with the following content:
 
-   ```yaml
-   services:
-     replicate-flux-lora:
-       image: ghcr.io/rtuszik/replicate-flux-lora:latest
-       container_name: replicate-flux-lora
-       ports:
-         - "8080:8080"
-       volumes:
-         - replicate-flux-lora-settings:/app/settings
-         - ${HOST_OUTPUT_DIR}:/app/output
-       restart: unless-stopped
-   volumes:
-     replicate-flux-lora-settings:
-   ```
+    ```yaml
+    services:
+        replicate-flux-lora:
+            image: ghcr.io/rtuszik/replicate-flux-lora:latest
+            container_name: replicate-flux-lora
+            ports:
+                - "8080:8080"
+            volumes:
+                - replicate-flux-lora-settings:/app/settings
+                - ${HOST_OUTPUT_DIR}:/app/output
+            restart: unless-stopped
+    volumes:
+        replicate-flux-lora-settings:
+    ```
 
-4. Replace `/path/to/your/output/directory` with the actual path where you want to save the generated images on your host machine.
+4. Set the `HOST_OUTPUT_DIR` environment variable to the directory where you want to save generated images:
+
+    ```bash
+    export HOST_OUTPUT_DIR=/path/to/your/output/directory
+    ```
+
+    Replace `/path/to/your/output/directory` with the actual path on your host machine.
 
 5. Run the application using Docker Compose:
 
-   ```bash
-   docker-compose up -d
-   ```
+    ```bash
+    docker-compose up -d
+    ```
 
 6. Access the application at `http://localhost:8080`
+
+### Local Development
+
+For local development, you can run the application directly with Python. The project supports both traditional pip/venv and modern uv package manager.
+
+#### Option 1: Using uv (Recommended)
+
+1. Install [uv](https://docs.astral.sh/uv/):
+
+    ```bash
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+    ```
+
+2. Clone the repository:
+
+    ```bash
+    git clone https://github.com/rtuszik/replicate-flux-lora.git
+    cd replicate-flux-lora
+    ```
+
+3. Install dependencies and run:
+    ```bash
+    uv sync
+    uv run python src/main.py
+    ```
+
+#### Option 2: Using pip and venv
+
+1. Clone the repository:
+
+    ```bash
+    git clone https://github.com/rtuszik/replicate-flux-lora.git
+    cd replicate-flux-lora
+    ```
+
+2. Create and activate a virtual environment:
+
+    ```bash
+    python3 -m venv .venv
+    source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+    ```
+
+3. Install dependencies:
+
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+4. Run the application:
+
+    ```bash
+    python3 src/main.py
+    ```
+
+5. Access the application at `http://localhost:8080`
 
 ## Usage
 
@@ -68,14 +135,6 @@ Docker is the recommended way to run this application. Follow these steps to get
 
 In order to fine-tune you own model, please check out Replicate's guide on fine-tuning Flux:
 <https://replicate.com/blog/fine-tune-flux>
-
-## Roadmap
-
-- [ ] Option to Store Metadata to Images
-- [ ] Option for Automatic Downloads through Browser
-- [ ] Running Base Flux.1 Models
-- [ ] Run Models with File Input
-- [ ] Cancel Generations
 
 ## API Key Setup
 
