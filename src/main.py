@@ -39,10 +39,15 @@ logger.info("Creating and setting up GUI")
 
 @ui.page("/")
 async def main_page():
-    logger.debug("Creating GUI")
-    gui = ImageGeneratorGUI(generator)
-    gui.setup_ui()
-    logger.debug("GUI created")
+    try:
+        logger.debug("Creating GUI")
+        gui = ImageGeneratorGUI(generator)
+        gui.setup_ui()
+        logger.debug("GUI created")
+    except Exception as e:
+        logger.exception(f"Error creating GUI: {e}")
+        ui.label(f"Error loading GUI: {e}")
+        raise
 
 
 logger.info("Starting NiceGUI server")

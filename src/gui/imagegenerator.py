@@ -2,9 +2,9 @@ import asyncio
 import json
 import os
 import urllib.parse
-import uuid
 from datetime import datetime
 from pathlib import Path
+import uuid
 
 import httpx
 from loguru import logger
@@ -24,6 +24,7 @@ class ImageGeneratorGUI(GUIPanels, UserModels):
         self.image_generator = image_generator
         self.api_key = Settings.get_api_key() or os.environ.get("REPLICATE_API_KEY", "")
         self.last_generated_images = []
+        Styles.setup_custom_styles()
         self._attributes = [
             "prompt",
             "flux_model",
@@ -43,27 +44,29 @@ class ImageGeneratorGUI(GUIPanels, UserModels):
         ]
 
         self.user_added_models = {}
-        
-        # Configuration mapping for settings
-        config_mapping = {
-            "prompt": ("", str),
-            "flux_model": ("dev", str),
-            "aspect_ratio": ("1:1", str),
-            "num_outputs": (1, int),
-            "lora_scale": (1.0, float),
-            "num_inference_steps": (28, int),
-            "guidance_scale": (3.5, float),
-            "output_format": ("png", str),
-            "output_quality": (80, int),
-            "disable_safety_checker": (True, bool),
-            "width": (1024, int),
-            "height": (1024, int),
-            "seed": (-1, int),
-        }
-        
-        # Apply all settings using the mapping
-        for attr, (default_value, value_type) in config_mapping.items():
-            setattr(self, attr, Settings.get_setting("default", attr, default_value, value_type))
+        self.prompt = Settings.get_setting("default", "prompt", "", str)
+
+        self.flux_model = Settings.get_setting("default", "flux_model", "dev", str)
+        self.aspect_ratio = Settings.get_setting("default", "aspect_ratio", "1:1", str)
+        self.num_outputs = int(float(Settings.get_setting("default", "num_outputs", 1, str)))
+        self.lora_scale = Settings.get_setting("default", "lora_scale", 1.0, float)
+        self.num_inference_steps = Settings.get_setting(
+            "default", "num_inference_steps", 28, int
+        )
+        self.guidance_scale = Settings.get_setting(
+            "default", "guidance_scale", 3.5, float
+        )
+        self.output_format = Settings.get_setting("default", "output_format", "png")
+        self.output_quality = Settings.get_setting(
+            "default", "output_quality", 80, int
+        )
+        self.disable_safety_checker = Settings.get_setting(
+            "default", "disable_safety_checker", True, bool
+        )
+
+        self.width = Settings.get_setting("default", "width", 1024, int)
+        self.height = Settings.get_setting("default", "height", 1024, int)
+        self.seed = Settings.get_setting("default", "seed", -1, int)
 
         self.output_folder = (
             "/app/output"
@@ -91,15 +94,14 @@ class ImageGeneratorGUI(GUIPanels, UserModels):
             # Fallback to empty dict
             self.user_added_models = {}
         self.model_options = list(self.user_added_models.keys())
-        self.replicate_model = Settings.get_setting(
-            "default", "replicate_model", "", str
-        )
+        saved_model = Settings.get_setting("default", "replicate_model", "", str)
+        # Ensure the saved model exists in the current model options
+        self.replicate_model = saved_model if saved_model in self.model_options else ""
 
         logger.info("ImageGeneratorGUI initialized")
 
     def setup_ui(self):
         logger.info("Setting up UI")
-        Styles.setup_custom_styles()
         ui.dark_mode(True)
         self.check_api_key()
 

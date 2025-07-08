@@ -32,7 +32,7 @@ class GUIPanels:
                 ui.select(
                     options=self.model_options,
                     label="Replicate Model",
-                    value=self.replicate_model,
+                    value=self.replicate_model if self.replicate_model in self.model_options else None,
                     on_change=lambda e: asyncio.create_task(
                         self.update_replicate_model(e.value)
                     ),
