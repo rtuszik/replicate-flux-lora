@@ -9,6 +9,7 @@ dependencies = [
     "httpx",
     "loguru",
     "nicegui",
+    "pillow>=11.3.0",
     "python-dotenv",
     "replicate",
     "token-count",
