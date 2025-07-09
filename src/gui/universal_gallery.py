@@ -189,19 +189,27 @@ class UniversalGallery:
     def _create_generation_card(self, generation: GenerationRecord):
         """Create a simple card for a generation"""
         with self.gallery_container:
-            with ui.card().classes("relative cursor-pointer hover:shadow-lg transition-shadow dark:bg-[#181825] bg-[#ccd0da] aspect-square").on("click", lambda g=generation: self._show_lightbox(g)):
-                # Image preview
-                image_path = self._get_image_path(generation)
-                logger.debug(f"Gallery card for generation {generation.id}: image_path={image_path}")
-                
-                if image_path:
-                    logger.debug(f"Using image path for ui.image(): {image_path}")
-                    ui.html(f'<img src="{image_path}" class="w-full h-full object-cover rounded" alt="Generated image">').classes("w-full h-full")
-                else:
-                    logger.debug(f"Using placeholder for generation {generation.id}")
-                    placeholder = self._create_placeholder(generation)
-                    with ui.element("div").classes("w-full h-full dark:bg-[#313244] bg-gray-200 flex items-center justify-center rounded"):
-                        ui.label(placeholder).classes("text-4xl")
+            with ui.card().classes("relative cursor-pointer hover:shadow-lg transition-shadow dark:bg-[#181825] bg-[#ccd0da] aspect-square min-h-[200px] min-w-[200px]").on("click", lambda g=generation: self._show_lightbox(g)):
+                # Image preview with minimum size container
+                with ui.element("div").classes("w-full h-full min-h-[200px] relative"):
+                    image_path = self._get_image_path(generation)
+                    logger.debug(f"Gallery card for generation {generation.id}: image_path={image_path}")
+                    
+                    if image_path:
+                        logger.debug(f"Using image path for ui.image(): {image_path}")
+                        # Try direct file path first (NiceGUI v1.2.20+ can handle local files)
+                        if os.path.exists(image_path.replace('/outputs/', 'replicate_outputs/')):
+                            direct_path = image_path.replace('/outputs/', 'replicate_outputs/')
+                            logger.debug(f"Using direct file path: {direct_path}")
+                            ui.image(direct_path).classes("w-full h-full object-cover rounded")
+                        else:
+                            logger.debug(f"Using URL path: {image_path}")
+                            ui.image(image_path).classes("w-full h-full object-cover rounded")
+                    else:
+                        logger.debug(f"Using placeholder for generation {generation.id}")
+                        placeholder = self._create_placeholder(generation)
+                        with ui.element("div").classes("w-full h-full dark:bg-[#313244] bg-gray-200 flex items-center justify-center rounded"):
+                            ui.label(placeholder).classes("text-4xl")
                 
                 # Simple overlay with just a favorite button
                 with ui.element("div").classes("absolute top-2 right-2"):
@@ -209,7 +217,7 @@ class UniversalGallery:
                     ui.button(fav_icon, on_click=lambda g=generation: self._toggle_favorite(g)).props("flat dense").classes("bg-black bg-opacity-50 text-white")
 
     def _get_image_path(self, generation: GenerationRecord) -> Optional[str]:
-        """Get the first image path for a generation - returns static URL for NiceGUI"""
+        """Get the first image path for a generation - returns media URL for NiceGUI"""
         logger.debug(f"Getting image path for generation {generation.id}")
         
         if generation.outputs:
@@ -231,13 +239,13 @@ class UniversalGallery:
                     logger.debug(f"Checking if file exists: {os.path.exists(abs_path)}")
                     if os.path.exists(abs_path):
                         if file_path.startswith("replicate_outputs/"):
-                            static_url = f"/outputs/{file_path.replace('replicate_outputs/', '')}"
+                            media_url = f"/outputs/{file_path.replace('replicate_outputs/', '')}"
                         else:
                             rel_path = os.path.relpath(abs_path, str(self.output_dir))
-                            static_url = f"/outputs/{rel_path}"
+                            media_url = f"/outputs/{rel_path}"
                         
-                        logger.debug(f"File exists, returning static URL: {static_url}")
-                        return static_url
+                        logger.debug(f"File exists, returning media URL: {media_url}")
+                        return media_url
                     else:
                         logger.debug(f"File does not exist: {abs_path}")
         else:
@@ -246,9 +254,9 @@ class UniversalGallery:
         logger.debug(f"No image path found for generation {generation.id}")
         return None
 
-    def _convert_to_static_url(self, file_path: str) -> str:
-        """Convert file path to static URL for NiceGUI serving"""
-        logger.debug(f"Converting to static URL: {file_path}")
+    def _convert_to_url(self, file_path: str, output_type: str = "image") -> str:
+        """Convert file path to appropriate URL for NiceGUI serving"""
+        logger.debug(f"Converting to URL: {file_path}, type: {output_type}")
         
         if os.path.isabs(file_path):
             abs_path = file_path
@@ -260,13 +268,18 @@ class UniversalGallery:
         
         if os.path.exists(abs_path):
             if file_path.startswith("replicate_outputs/"):
-                static_url = f"/outputs/{file_path.replace('replicate_outputs/', '')}"
+                rel_path = file_path.replace('replicate_outputs/', '')
             else:
                 rel_path = os.path.relpath(abs_path, str(self.output_dir))
-                static_url = f"/outputs/{rel_path}"
             
-            logger.debug(f"Generated static URL: {static_url}")
-            return static_url
+            # Use static files for images, media files for videos/audio
+            if output_type in ["video", "audio"]:
+                url = f"/media/{rel_path}"
+            else:
+                url = f"/outputs/{rel_path}"
+            
+            logger.debug(f"Generated URL: {url}")
+            return url
         
         logger.debug(f"File does not exist, returning original path: {file_path}")
         return file_path
@@ -348,11 +361,11 @@ class UniversalGallery:
                 ui.label(f"Output {i+1} - {output_type.title()}").classes("font-bold")
                 
                 if output_type == "image":
-                    ui.image(self._convert_to_static_url(file_path)).classes("w-full max-h-96 object-contain")
+                    ui.image(self._convert_to_url(file_path, "image")).classes("w-full max-h-96 object-contain")
                 elif output_type == "video":
-                    ui.video(self._convert_to_static_url(file_path)).classes("w-full max-h-96")
+                    ui.video(self._convert_to_url(file_path, "video")).classes("w-full max-h-96")
                 elif output_type == "audio":
-                    ui.audio(self._convert_to_static_url(file_path)).classes("w-full")
+                    ui.audio(self._convert_to_url(file_path, "audio")).classes("w-full")
                 elif output_type == "text":
                     # Read and display text content
                     try:

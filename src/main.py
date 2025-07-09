@@ -52,12 +52,16 @@ async def main_page():
 
 logger.info("Starting NiceGUI server")
 
-# Add static file serving for images
+# Add static file serving for images and media file serving for videos/audio
 from nicegui import app
 import os
 output_dir = os.path.abspath("./replicate_outputs")
 if os.path.exists(output_dir):
+    # Use static files for images (better compatibility)
     app.add_static_files("/outputs", output_dir)
+    # Also add media files for streaming video/audio
+    app.add_media_files("/media", output_dir)
     logger.info(f"Added static file serving for {output_dir}")
+    logger.info(f"Added media file serving for {output_dir}")
 
 ui.run(title="Universal Replicate Interface", port=8080, favicon="🚀")
