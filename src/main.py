@@ -9,17 +9,17 @@ sys.path.insert(0, str(src_path))
 from loguru import logger  # noqa: E402
 from nicegui import ui  # noqa: E402
 
-from gui.imagegenerator import ImageGeneratorGUI  # noqa: E402
+from gui.universal_generator import UniversalReplicateGUI  # noqa: E402
 from util.replicate_api import Replicate_API  # noqa: E402
 from util.settings import Settings  # noqa: E402
 
 logger.add(
-    sys.stderr, format="{time} {level} {message}", filter="my_module", level="INFO"
+    sys.stderr, format="{time} {level} {message}", filter="my_module", level="DEBUG"
 )
 logger.add(
     "app.log",
     format="{time} {level} {module}:{line} {message}",
-    level="INFO",
+    level="DEBUG",
     rotation="500 MB",
     compression="zip",
 )
@@ -40,10 +40,10 @@ logger.info("Creating and setting up GUI")
 @ui.page("/")
 async def main_page():
     try:
-        logger.debug("Creating GUI")
-        gui = ImageGeneratorGUI(generator)
+        logger.debug("Creating Universal GUI")
+        gui = UniversalReplicateGUI(generator)
         gui.setup_ui()
-        logger.debug("GUI created")
+        logger.debug("Universal GUI created")
     except Exception as e:
         logger.exception(f"Error creating GUI: {e}")
         ui.label(f"Error loading GUI: {e}")
@@ -52,4 +52,12 @@ async def main_page():
 
 logger.info("Starting NiceGUI server")
 
-ui.run(title="Replicate Flux LoRA", port=8080, favicon="🚀")
+# Add static file serving for images
+from nicegui import app
+import os
+output_dir = os.path.abspath("./replicate_outputs")
+if os.path.exists(output_dir):
+    app.add_static_files("/outputs", output_dir)
+    logger.info(f"Added static file serving for {output_dir}")
+
+ui.run(title="Universal Replicate Interface", port=8080, favicon="🚀")
